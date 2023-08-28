@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+
+    <color name="text_primary">#FF333333</color>
+    <color name="text_secondary">#FF666666</color>
+
+    <!-- darkColors -->
+    <color name="primary">#FFBB86FC</color>
+    <color name="primaryVariant">#FF3700B3</color>
+    <color name="secondary">#FF3700B3</color>
+    <color name="secondaryVariant">#FF3700B3</color>
+    <color name="background">#FF121212</color>
+    <color name="surface">#FF121212</color>
+    <color name="error">#FFCF6679</color>
+    <color name="onPrimary">@color/black</color>
+    <color name="onSecondary">@color/black</color>
+    <color name="onBackground">@color/white</color>
+    <color name="onSurface">@color/white</color>
+    <color name="onError">@color/black</color>
+
+    <!-- lightColors -->
+<!--    <color name="primary">#FF6200EE</color>-->
+<!--    <color name="primaryVariant">#FF3700B3</color>-->
+<!--    <color name="secondary">#FF03DAC6</color>-->
+<!--    <color name="secondaryVariant">#FF018786</color>-->
+<!--    <color name="background">@color/white</color>-->
+<!--    <color name="surface">@color/white</color>-->
+<!--    <color name="error">#FFB00020</color>-->
+<!--    <color name="onPrimary">@color/white</color>-->
+<!--    <color name="onSecondary">@color/black</color>-->
+<!--    <color name="onBackground">@color/black</color>-->
+<!--    <color name="onSurface">@color/black</color>-->
+<!--    <color name="onError">@color/white</color>-->
+
+
+</resources>
