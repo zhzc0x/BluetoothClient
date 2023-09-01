@@ -14,7 +14,7 @@
         android:theme="@style/Theme.BluetoothClient"
         tools:targetApi="31">
         <activity
-            android:name="com.zhzch0x.bluetooth.demo.MainActivity"
+            android:name="com.zhzch0x.bluetooth.demo.ui.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

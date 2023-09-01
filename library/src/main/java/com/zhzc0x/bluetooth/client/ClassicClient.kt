@@ -22,7 +22,7 @@ import kotlin.concurrent.thread
  * */
 @SuppressLint("MissingPermission")
 internal class ClassicClient(override val context: Context,
-                             override val bluetoothAdapter: BluetoothAdapter,
+                             override val bluetoothAdapter: BluetoothAdapter?,
                              override var serviceUUID: UUID?,
                              override val logTag: String) : Client {
 
@@ -79,7 +79,7 @@ internal class ClassicClient(override val context: Context,
     override fun startScan(callback: ScanDeviceCallback) {
         scanDeviceCallback = callback
         registerStateReceiver()
-        bluetoothAdapter.startDiscovery()
+        bluetoothAdapter!!.startDiscovery()
         bluetoothAdapter.bondedDevices.forEach {
             Timber.d("$logTag --> 已配对设备：$it, ${it.uuids.size}, ${it.fetchUuidsWithSdp()}")
             scanDeviceCallback.call(Device(it.address, it.name, Device.typeOf(it.type)))
@@ -88,7 +88,7 @@ internal class ClassicClient(override val context: Context,
     }
 
     override fun stopScan() {
-        if(bluetoothAdapter.isDiscovering){
+        if(bluetoothAdapter != null && bluetoothAdapter.isDiscovering){
             bluetoothAdapter.cancelDiscovery()
         }
     }
@@ -111,36 +111,9 @@ internal class ClassicClient(override val context: Context,
         connectStateCallback = stateCallback
         connectStateCallback.call(ConnectState.CONNECTING)
         scheduleTimeoutTask(timeoutMillis){
-            connectStateCallback.call(ConnectState.CONNECT_TIMEOUT)
+            callConnectState(ConnectState.CONNECT_TIMEOUT)
         }
-        connect(bluetoothAdapter.getRemoteDevice(device.address))
-    }
-
-    override fun supportedServices(): List<Service>? {
-        return realDevice?.uuids?.map { Service(it.uuid, Service.Type.UNKNOWN, null, null) }
-    }
-
-    override fun assignService(service: Service) {
-        serviceUUID = service.uuid
-        if(realDevice != null){
-            createRfcommSocket()
-        }
-    }
-    
-    private fun scheduleTimeoutTask(timeoutMillis: Long, onTask: () -> Unit){
-        cancelTimeoutTask()
-        timeoutTask = object: TimerTask(){
-            override fun run() {
-                cancelTimeoutTask()
-                onTask()
-            }
-        }
-        timer.schedule(timeoutTask, timeoutMillis)
-    }
-
-    private fun cancelTimeoutTask(){
-        timeoutTask?.cancel()
-        timeoutTask = null
+        connect(bluetoothAdapter!!.getRemoteDevice(device.address))
     }
 
     private fun connect(realDevice: BluetoothDevice){
@@ -152,14 +125,13 @@ internal class ClassicClient(override val context: Context,
         this.realDevice = realDevice
         if(serviceUUID != null){
             if(createRfcommSocket()){
-                connectStateCallback.call(ConnectState.CONNECTED)
+                callConnectState(ConnectState.CONNECTED)
             } else {
-                connectStateCallback.call(ConnectState.CONNECT_ERROR)
+                callConnectState(ConnectState.CONNECT_ERROR)
             }
         } else {
-            connectStateCallback.call(ConnectState.CONNECTED)
+            callConnectState(ConnectState.CONNECTED)
         }
-        cancelTimeoutTask()
     }
 
     private fun createRfcommSocket(): Boolean{
@@ -171,6 +143,27 @@ internal class ClassicClient(override val context: Context,
         } catch (iex: IOException){
             Timber.e(iex,"$logTag --> createRfcommSocket failed")
             false
+        }
+    }
+
+    private fun callConnectState(state: ConnectState){
+        cancelTimeoutTask()
+        connectStateCallback.call(state)
+    }
+
+    override fun changeMtu(mtu: Int): Boolean {
+        this.mtu = mtu
+        return true
+    }
+
+    override fun supportedServices(): List<Service>? {
+        return realDevice?.uuids?.map { Service(it.uuid, Service.Type.UNKNOWN, null, null) }
+    }
+
+    override fun assignService(service: Service) {
+        serviceUUID = service.uuid
+        if(realDevice != null){
+            createRfcommSocket()
         }
     }
 
@@ -196,7 +189,7 @@ internal class ClassicClient(override val context: Context,
         }
         thread {
             var readFailedCount = 0
-            val buffer = ByteArray(if(mtu > 0) mtu else 102)
+            val buffer = ByteArray(if(mtu > 0) mtu else 1024)
             while (bluetoothSocket?.isConnected == true && readFailedCount < 3){
                 try {
                     val len = bluetoothSocket!!.inputStream.read(buffer)
@@ -214,23 +207,62 @@ internal class ClassicClient(override val context: Context,
         return true
     }
 
-    override fun sendData(uuid: UUID?, data: ByteArray, timeoutMillis: Long, callback: ResultCallback) {
+    override fun sendData(uuid: UUID?, data: ByteArray, timeoutMillis: Long, callback: DataResultCallback) {
         if(!checkClientValid()){
-            callback.call(false)
+            callback.call(false, data)
             return
         }
         scheduleTimeoutTask(timeoutMillis){
             Timber.e("$logTag --> sendData timeout")
-            callback.call(false)
+            callback.call(false, data)
         }
         try {
             bluetoothSocket!!.outputStream.write(data)
-            callback.call(true)
+            cancelTimeoutTask()
+            callback.call(true, data)
         } catch (iex: IOException){
             Timber.e(iex,"$logTag --> write failed")
-            callback.call(false)
+            cancelTimeoutTask()
+            callback.call(false, data)
         }
+    }
+
+    override fun readData(uuid: UUID?, timeoutMillis: Long, callback: DataResultCallback) {
+        if(!checkClientValid()){
+            callback.call(false, null)
+            return
+        }
+        scheduleTimeoutTask(timeoutMillis){
+            Timber.e("$logTag --> readData timeout")
+            callback.call(false, null)
+        }
+        try {
+            val buffer = ByteArray(if(mtu > 0) mtu else 1024)
+            val len = bluetoothSocket!!.inputStream.read(buffer)
+            val readData = ByteArray(len)
+            System.arraycopy(buffer, 0, readData, 0, len)
+            cancelTimeoutTask()
+            callback.call(true, readData)
+        } catch (iex: IOException){
+            Timber.e(iex,"$logTag --> readData failed")
+            cancelTimeoutTask()
+            callback.call(false, null)
+        }
+    }
+
+    private fun scheduleTimeoutTask(timeoutMillis: Long, onTask: () -> Unit){
         cancelTimeoutTask()
+        timeoutTask = object: TimerTask(){
+            override fun run() {
+                onTask()
+            }
+        }
+        timer.schedule(timeoutTask, timeoutMillis)
+    }
+
+    private fun cancelTimeoutTask(){
+        timeoutTask?.cancel()
+        timeoutTask = null
     }
 
     override fun disconnect() {
@@ -238,8 +270,8 @@ internal class ClassicClient(override val context: Context,
             bluetoothSocket!!.safeClose()
             bluetoothSocket = null
             realDevice = null
-            cancelTimeoutTask()
-            connectStateCallback.call(ConnectState.DISCONNECTED)
+            callConnectState(ConnectState.DISCONNECTED)
+            Timber.d("$logTag --> 主动 disconnect")
         }
     }
 

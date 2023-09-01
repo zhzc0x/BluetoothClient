@@ -25,14 +25,15 @@ import java.util.UUID
  * */
 @SuppressLint("MissingPermission")
 internal class BleClient(override val context: Context,
-                         override val bluetoothAdapter: BluetoothAdapter,
+                         override val bluetoothAdapter: BluetoothAdapter?,
                          override var serviceUUID: UUID?,
                          override val logTag: String) : Client {
 
     private lateinit var scanDeviceCallback: ScanDeviceCallback
     private lateinit var connectStateCallback: ConnectStateCallback
     private val receiveDataMap = HashMap<UUID, (ByteArray) -> Unit>()
-    private val sendDataMap = HashMap<ByteArray, ResultCallback>()
+    private val writeDataMap = HashMap<ByteArray, DataResultCallback>()
+    private val readDataMap = HashMap<UUID, DataResultCallback>()
     private var bluetoothGatt: BluetoothGatt? = null
     private var mtu = 0
     private val timer = Timer()
@@ -50,21 +51,24 @@ internal class BleClient(override val context: Context,
 
     override fun startScan(callback: ScanDeviceCallback) {
         scanDeviceCallback = callback
-        bluetoothAdapter.bluetoothLeScanner.startScan(null, ScanSettings.Builder()
+        bluetoothAdapter!!.bluetoothLeScanner!!.startScan(null, ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build(), scanCallback)
     }
 
     override fun stopScan() {
-        bluetoothAdapter.bluetoothLeScanner.stopScan(scanCallback)
+        if(bluetoothAdapter != null){
+            bluetoothAdapter.bluetoothLeScanner!!.stopScan(scanCallback)
+        }
     }
 
     private val gattCallback = object : BluetoothGattCallback() {
+        private var discoveredServices = false
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             if (newState == BluetoothProfile.STATE_CONNECTED) {
+                discoveredServices = false
                 var mtuResult = false
                 if(mtu > 0){
-                    mtuResult = bluetoothGatt!!.requestMtu(mtu)
-                    Timber.d("$logTag --> requestMtu($mtu)=$mtuResult")
+                    mtuResult = changeMtu(mtu)
                 }
                 if(!mtuResult){
                     discoverServices()
@@ -76,23 +80,21 @@ internal class BleClient(override val context: Context,
 
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
             if(status == BluetoothGatt.GATT_SUCCESS){
+                discoveredServices = true
                 if(serviceUUID == null){
-                    cancelTimeoutTask()
-                    connectStateCallback.call(ConnectState.CONNECTED)
+                    callConnectState(ConnectState.CONNECTED)
                     return
                 }
                 val gattService = bluetoothGatt!!.getService(serviceUUID)
-                cancelTimeoutTask()
                 if(gattService != null){
-                    connectStateCallback.call(ConnectState.CONNECTED)
+                    callConnectState(ConnectState.CONNECTED)
                 } else {
                     Timber.e("$logTag --> onServicesDiscovered: getService($serviceUUID)=null")
-                    connectStateCallback.call(ConnectState.CONNECT_ERROR)
+                    callConnectState(ConnectState.CONNECT_ERROR)
                 }
             } else {
                 Timber.e("$logTag --> onServicesDiscovered: status=$status")
-                cancelTimeoutTask()
-                connectStateCallback.call(ConnectState.CONNECT_ERROR)
+                callConnectState(ConnectState.CONNECT_ERROR)
             }
         }
 
@@ -101,24 +103,30 @@ internal class BleClient(override val context: Context,
             receiveDataMap[characteristic.uuid]?.invoke(characteristic.value)
         }
 
-        override fun onCharacteristicWrite(
-            gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
+        override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic:
+        BluetoothGattCharacteristic, status: Int) {
             Timber.d("$logTag --> onCharacteristicWrite: value=${String(characteristic.value)}, status=$status")
-            sendDataMap.remove(characteristic.value)?.call(status == BluetoothGatt.GATT_SUCCESS)
+            callSendDataResult(characteristic.value, status == BluetoothGatt.GATT_SUCCESS)
+        }
+
+        override fun onCharacteristicRead(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic,
+            status: Int) {
+            Timber.d("$logTag --> onCharacteristicRead: value=${characteristic.value.contentToString()}, status=$status")
+            callReadDataResult(characteristic.uuid, status == BluetoothGatt.GATT_SUCCESS, characteristic.value)
         }
 
         override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
-            super.onMtuChanged(gatt, mtu, status)
             Timber.d("$logTag --> onMtuChanged: status=${status}, mtu=$mtu")
-            discoverServices()
+            if(!discoveredServices){
+                discoverServices()
+            }
         }
     }
 
     private fun discoverServices(){
         if(!bluetoothGatt!!.discoverServices()){
             Timber.e("$logTag --> discoverServices=false")
-            cancelTimeoutTask()
-            connectStateCallback.call(ConnectState.CONNECT_ERROR)
+            callConnectState(ConnectState.CONNECT_ERROR)
         }
     }
 
@@ -127,11 +135,11 @@ internal class BleClient(override val context: Context,
         connectStateCallback = stateCallback
         connectStateCallback.call(ConnectState.CONNECTING)
         scheduleTimeoutTask(timeoutMillis){
-            connectStateCallback.call(ConnectState.CONNECT_TIMEOUT)
+            callConnectState(ConnectState.CONNECT_TIMEOUT)
         }
-        val realDevice = bluetoothAdapter.getRemoteDevice(device.address)
-        bluetoothGatt!!.services
-        realDevice.uuids
+        val realDevice = bluetoothAdapter!!.getRemoteDevice(device.address)
+        bluetoothGatt?.disconnect()
+        bluetoothGatt?.close()
         bluetoothGatt = when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> {
                 realDevice.connectGatt(context, false, gattCallback,
@@ -149,15 +157,27 @@ internal class BleClient(override val context: Context,
         }
     }
 
+    private fun callConnectState(state: ConnectState){
+        cancelTimeoutTask()
+        connectStateCallback.call(state)
+    }
+
+    override fun changeMtu(mtu: Int): Boolean {
+        this.mtu = mtu
+        val mtuResult = bluetoothGatt?.requestMtu(this.mtu) == true
+        Timber.d("$logTag --> requestMtu($mtu)=$mtuResult")
+        return mtuResult
+    }
+
     override fun supportedServices(): List<Service>? {
         return bluetoothGatt?.services?.map { getGattService ->
             Service(getGattService.uuid, Service.typeOf(getGattService.type),
                 getGattService.characteristics.map {
-                    Characteristic(it.uuid, Characteristic.propertyOf(it.properties))
+                    Characteristic(it.uuid, Characteristic.getProperties(it.properties))
                 },getGattService.includedServices.map { includedService ->
                     Service(includedService.uuid, Service.typeOf(includedService.type),
                         includedService.characteristics.map {
-                            Characteristic(it.uuid, Characteristic.propertyOf(it.properties))
+                            Characteristic(it.uuid, Characteristic.getProperties(it.properties))
                         },null)
                 })
         }
@@ -165,22 +185,6 @@ internal class BleClient(override val context: Context,
 
     override fun assignService(service: Service){
         serviceUUID = service.uuid
-    }
-
-    private fun scheduleTimeoutTask(timeoutMillis: Long, onTask: () -> Unit){
-        cancelTimeoutTask()
-        timeoutTask = object: TimerTask(){
-            override fun run() {
-                cancelTimeoutTask()
-                onTask()
-            }
-        }
-        timer.schedule(timeoutTask, timeoutMillis)
-    }
-
-    private fun cancelTimeoutTask(){
-        timeoutTask?.cancel()
-        timeoutTask = null
     }
 
     private fun getGattService(): BluetoothGattService?{
@@ -217,28 +221,76 @@ internal class BleClient(override val context: Context,
         return notificationResult
     }
 
-    override fun sendData(uuid: UUID?, data: ByteArray, timeoutMillis: Long, callback: ResultCallback) {
+    override fun sendData(uuid: UUID?, data: ByteArray, timeoutMillis: Long, callback: DataResultCallback) {
         val gattService = getGattService()
         if(gattService == null){
-            callback.call(false)
+            callback.call(false, data)
             return
         }
-        sendDataMap[data] = callback
+        writeDataMap[data] = callback
         scheduleTimeoutTask(timeoutMillis){
             Timber.e("$logTag --> sendData timeout")
-            sendDataMap.remove(data)?.call(false)
+            callSendDataResult(data, false)
         }
         val writeCharacteristic = gattService.getCharacteristic(uuid)
         if(writeCharacteristic != null){
             writeCharacteristic.value = data
             if(!bluetoothGatt!!.writeCharacteristic(writeCharacteristic)){
                 Timber.e("$logTag --> sendData: writeCharacteristic=false")
-                sendDataMap.remove(data)?.call(false)
+                callSendDataResult(data, false)
             }
         } else {
             Timber.e("$logTag --> sendData: getCharacteristic($uuid)=null")
-            sendDataMap.remove(data)?.call(false)
+            callSendDataResult(data, false)
         }
+    }
+
+    private fun callSendDataResult(data: ByteArray, success: Boolean){
+        cancelTimeoutTask()
+        writeDataMap.remove(data)?.call(success, data)
+    }
+
+    override fun readData(uuid: UUID?, timeoutMillis: Long, callback: DataResultCallback) {
+        val gattService = getGattService()
+        if(gattService == null){
+            callback.call(false, null)
+            return
+        }
+        readDataMap[uuid!!] = callback
+        scheduleTimeoutTask(timeoutMillis){
+            Timber.e("$logTag --> readData timeout")
+            callReadDataResult(uuid, false)
+        }
+        val readCharacteristic = gattService.getCharacteristic(uuid)
+        if(readCharacteristic != null){
+            if(!bluetoothGatt!!.readCharacteristic(readCharacteristic)){
+                Timber.e("$logTag --> readData: readCharacteristic=false")
+                callReadDataResult(uuid, false)
+            }
+        } else {
+            Timber.e("$logTag --> readData: getCharacteristic($uuid)=null")
+            callReadDataResult(uuid, false)
+        }
+    }
+
+    private fun callReadDataResult(uuid: UUID, success: Boolean, data: ByteArray? = null){
+        cancelTimeoutTask()
+        readDataMap.remove(uuid)?.call(success, data)
+    }
+
+    private fun scheduleTimeoutTask(timeoutMillis: Long, onTask: () -> Unit){
+        cancelTimeoutTask()
+        timeoutTask = object: TimerTask(){
+            override fun run() {
+                onTask()
+            }
+        }
+        timer.schedule(timeoutTask, timeoutMillis)
+    }
+
+    private fun cancelTimeoutTask(){
+        timeoutTask?.cancel()
+        timeoutTask = null
     }
 
     override fun disconnect() {
@@ -247,9 +299,9 @@ internal class BleClient(override val context: Context,
             bluetoothGatt?.close()
             bluetoothGatt = null
             receiveDataMap.clear()
-            sendDataMap.clear()
-            cancelTimeoutTask()
-            connectStateCallback.call(ConnectState.DISCONNECTED)
+            writeDataMap.clear()
+            callConnectState(ConnectState.DISCONNECTED)
+            Timber.d("$logTag --> 主动 disconnect")
         }
     }
 

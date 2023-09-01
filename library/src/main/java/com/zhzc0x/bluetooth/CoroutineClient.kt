@@ -8,12 +8,14 @@ import com.zhzc0x.bluetooth.client.Client
 import com.zhzc0x.bluetooth.client.ClientType
 import com.zhzc0x.bluetooth.client.ConnectState
 import com.zhzc0x.bluetooth.client.Device
+import com.zhzc0x.bluetooth.client.Service
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.SendChannel
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -27,6 +29,9 @@ class CoroutineClient(private val context: Context, type: ClientType, serviceUUI
     private val client: Client
     private val bluetoothAdapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
         ?: throw RuntimeException("当前设备不支持蓝牙功能！")
+    private var scanDeviceChannel: SendChannel<Device>? = null
+    private var connectStateChannel: SendChannel<ConnectState>? = null
+    private var receiveDataChannel: SendChannel<ByteArray>? = null
 
     init {
         client = when(type){
@@ -42,48 +47,68 @@ class CoroutineClient(private val context: Context, type: ClientType, serviceUUI
        if(!BluetoothHelper.checkBluetoothValid(context, bluetoothAdapter)){
            return emptyFlow()
        }
-        return callbackFlow {
-            client.startScan{ device ->
-                trySend(device)
-            }
-            delay(timeMillis)
-            close()
-            stopScan()
-        }
+       return channelFlow {
+           scanDeviceChannel = channel
+           Timber.d("$logTag --> 开始扫描设备")
+           client.startScan{ device ->
+               Timber.d("$logTag --> Scan: $device")
+               trySend(device)
+           }
+           delay(timeMillis)
+           close()
+           stopScan()
+       }
     }
 
-    fun stopScan(){
+    fun stopScan() {
+        scanDeviceChannel?.close()
         client.stopScan()
     }
 
-    suspend fun connect(device: Device, mtu: Int = 0, timeoutMillis: Long = 10000):
+    suspend fun connect(device: Device, mtu: Int = 0, timeoutMillis: Long = 6000):
             Flow<ConnectState> = withContext(Dispatchers.IO){
         if(!BluetoothHelper.checkBluetoothValid(context, bluetoothAdapter)){
             return@withContext emptyFlow()
         }
-        flow{
+        channelFlow{
+            connectStateChannel = channel
             client.connect(device, mtu, timeoutMillis){ connectState ->
                 this@withContext.launch {
-                    emit(connectState)
+                    send(connectState)
                 }
             }
+            awaitClose()
         }
     }
 
-    suspend fun receiveData(readUUID: UUID? = null): Flow<ByteArray> = withContext(Dispatchers.IO){
-        flow {
-            client.receiveData(readUUID) { readData ->
+    suspend fun changeMtu(mtu: Int) = withContext(Dispatchers.IO){
+        client.changeMtu(mtu)
+    }
+
+    suspend fun supportedServices() = withContext(Dispatchers.IO){
+        client.supportedServices()
+    }
+
+    suspend fun assignService(service: Service) = withContext(Dispatchers.IO){
+        client.assignService(service)
+    }
+
+    suspend fun receiveData(uuid: UUID? = null): Flow<ByteArray> = withContext(Dispatchers.IO){
+        channelFlow {
+            receiveDataChannel = channel
+            client.receiveData(uuid) { readData ->
                 this@withContext.launch {
-                    emit(readData)
+                    send(readData)
                 }
             }
+            awaitClose()
         }
     }
 
     suspend fun sendData(uuid: UUID? = null, data: ByteArray,
                          timeoutMillis: Long = 3000): Boolean = withContext(Dispatchers.IO){
         suspendCancellableCoroutine { continuation ->
-            client.sendData(uuid, data, timeoutMillis){ success ->
+            client.sendData(uuid, data, timeoutMillis){ success, _ ->
                 if(!continuation.isCompleted){
                     continuation.resume(success)
                 }
@@ -94,15 +119,29 @@ class CoroutineClient(private val context: Context, type: ClientType, serviceUUI
         }
     }
 
+    suspend fun readData(uuid: UUID? = null, data: ByteArray,
+                         timeoutMillis: Long = 3000): ByteArray? = withContext(Dispatchers.IO){
+        suspendCancellableCoroutine { continuation ->
+            client.readData(uuid, timeoutMillis){ _, data ->
+                if(!continuation.isCompleted){
+                    continuation.resume(data)
+                }
+            }
+            continuation.invokeOnCancellation {
+                continuation.resume(null)
+            }
+        }
+    }
+
     fun disconnect(){
         stopScan()
         client.disconnect()
-        Timber.d("$logTag --> 主动 disconnect")
+        connectStateChannel?.close()
+        receiveDataChannel?.close()
     }
 
     fun release(){
-        stopScan()
-        client.disconnect()
+        disconnect()
         BluetoothHelper.unregisterSwitchStateReceiver(context)
         client.release()
     }

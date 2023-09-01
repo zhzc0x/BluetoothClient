@@ -51,7 +51,11 @@ internal object BluetoothHelper {
     }
 
     @SuppressLint("MissingPermission")
-    fun checkBluetoothValid(context: Context, bluetoothAdapter: BluetoothAdapter): Boolean{
+    fun checkBluetoothValid(context: Context, bluetoothAdapter: BluetoothAdapter?): Boolean{
+        if(bluetoothAdapter == null){
+            Timber.d("$logTag --> 当前设备不支持蓝牙功能！")
+            return false
+        }
         if(!checkPermissions(context)){
             return false
         }

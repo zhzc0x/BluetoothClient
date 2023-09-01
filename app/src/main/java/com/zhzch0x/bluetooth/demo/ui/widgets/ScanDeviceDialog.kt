@@ -1,4 +1,4 @@
-package com.zhzch0x.bluetooth.demo
+package com.zhzch0x.bluetooth.demo.ui.widgets
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -70,7 +70,6 @@ class ScanDeviceDialog(uiContext: Context,
 
     fun add(deviceInfo: Device){
         deviceListAdapter.add(deviceInfo)
-        viewBinding.rvDeviceList.scrollToPosition(0)
         if(viewBinding.rvDeviceList.visibility == View.GONE){
             viewBinding.tvNoDevice.visibility = View.GONE
             viewBinding.rvDeviceList.visibility = View.VISIBLE

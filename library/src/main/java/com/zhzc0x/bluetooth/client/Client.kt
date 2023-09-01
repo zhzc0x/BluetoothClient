@@ -8,7 +8,7 @@ import java.util.UUID
 internal interface Client {
 
     val context: Context
-    val bluetoothAdapter: BluetoothAdapter
+    val bluetoothAdapter: BluetoothAdapter?
     val logTag: String
     var serviceUUID: UUID?
 
@@ -18,6 +18,8 @@ internal interface Client {
 
     fun connect(device: Device, mtu: Int, timeoutMillis: Long, stateCallback: ConnectStateCallback)
 
+    fun changeMtu(mtu: Int): Boolean
+
     fun supportedServices(): List<Service>? = null
 
     fun assignService(service: Service){
@@ -26,7 +28,9 @@ internal interface Client {
 
     fun receiveData(uuid: UUID?, onReceive: (ByteArray) -> Unit): Boolean
 
-    fun sendData(uuid: UUID?, data: ByteArray, timeoutMillis: Long, callback: ResultCallback)
+    fun sendData(uuid: UUID?, data: ByteArray, timeoutMillis: Long, callback: DataResultCallback)
+
+    fun readData(uuid: UUID?, timeoutMillis: Long, callback: DataResultCallback)
 
     fun disconnect()
 
@@ -87,7 +91,7 @@ data class Service(val uuid: UUID,
 }
 
 data class Characteristic(val uuid: UUID,
-                          val property: Property){
+                          val properties: List<Property>){
     enum class Property(val value: Int){
         BROADCAST(1), EXTENDED_PROPS(128), INDICATE(32), NOTIFY(16),
         READ(2), SIGNED_WRITE(64), WRITE(8), WRITE_NO_RESPONSE(4),
@@ -95,14 +99,13 @@ data class Characteristic(val uuid: UUID,
     }
 
     companion object{
-        fun propertyOf(value: Int): Property {
-            Characteristic.Property.values().forEach {
-                if(it.value == value){
-                    return it
-                }
+
+        fun getProperties(value: Int): List<Property>{
+            return Property.values().filter { property ->
+                (value and property.value) == property.value
             }
-            return Property.UNKNOWN
         }
+
     }
 
 }
@@ -123,9 +126,9 @@ fun interface ConnectStateCallback{
 
 }
 
-fun interface ResultCallback{
+fun interface DataResultCallback{
 
     @WorkerThread
-    fun call(success: Boolean)
+    fun call(success: Boolean, data: ByteArray?)
 
 }

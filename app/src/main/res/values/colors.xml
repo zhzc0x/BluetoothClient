@@ -21,6 +21,9 @@
     <color name="onSurface">@color/white</color>
     <color name="onError">@color/black</color>
 
+    <color name="logoutDebug">#299999</color>
+    <color name="logoutError">#FF6B68</color>
+
     <!-- lightColors -->
 <!--    <color name="primary">#FF6200EE</color>-->
 <!--    <color name="primaryVariant">#FF3700B3</color>-->
