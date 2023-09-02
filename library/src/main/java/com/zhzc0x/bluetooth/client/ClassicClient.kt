@@ -124,7 +124,7 @@ internal class ClassicClient(override val context: Context,
         }
         this.realDevice = realDevice
         if(serviceUUID != null){
-            if(createRfcommSocket()){
+            if(createRfcommSocketToConnect()){
                 callConnectState(ConnectState.CONNECTED)
             } else {
                 callConnectState(ConnectState.CONNECT_ERROR)
@@ -134,20 +134,23 @@ internal class ClassicClient(override val context: Context,
         }
     }
 
-    private fun createRfcommSocket(): Boolean{
+    private fun createRfcommSocketToConnect(): Boolean{
         return try {
             bluetoothSocket?.safeClose()
             bluetoothSocket = realDevice!!.createRfcommSocketToServiceRecord(serviceUUID)
             bluetoothSocket?.connect()
             true
         } catch (iex: IOException){
-            Timber.e(iex,"$logTag --> createRfcommSocket failed")
+            Timber.e(iex,"$logTag --> createRfcommSocketToConnect failed")
             false
         }
     }
 
     private fun callConnectState(state: ConnectState){
         cancelTimeoutTask()
+        if(state == ConnectState.CONNECT_TIMEOUT || state == ConnectState.CONNECT_ERROR){
+            bluetoothSocket?.safeClose()
+        }
         connectStateCallback.call(state)
     }
 
@@ -163,7 +166,7 @@ internal class ClassicClient(override val context: Context,
     override fun assignService(service: Service) {
         serviceUUID = service.uuid
         if(realDevice != null){
-            createRfcommSocket()
+            createRfcommSocketToConnect()
         }
     }
 
@@ -197,7 +200,7 @@ internal class ClassicClient(override val context: Context,
                     System.arraycopy(buffer, 0, readData, 0, len)
                     onReceive(readData)
                 } catch (iex: IOException){
-                    Timber.e(iex,"$logTag --> read failed ${++readFailedCount}")
+                    Timber.e(iex,"$logTag --> receiveData failed ${++readFailedCount}")
                 }
             }
             if(readFailedCount >= 3){
@@ -221,7 +224,7 @@ internal class ClassicClient(override val context: Context,
             cancelTimeoutTask()
             callback.call(true, data)
         } catch (iex: IOException){
-            Timber.e(iex,"$logTag --> write failed")
+            Timber.e(iex,"$logTag --> sendData failed")
             cancelTimeoutTask()
             callback.call(false, data)
         }
@@ -236,17 +239,19 @@ internal class ClassicClient(override val context: Context,
             Timber.e("$logTag --> readData timeout")
             callback.call(false, null)
         }
-        try {
-            val buffer = ByteArray(if(mtu > 0) mtu else 1024)
-            val len = bluetoothSocket!!.inputStream.read(buffer)
-            val readData = ByteArray(len)
-            System.arraycopy(buffer, 0, readData, 0, len)
-            cancelTimeoutTask()
-            callback.call(true, readData)
-        } catch (iex: IOException){
-            Timber.e(iex,"$logTag --> readData failed")
-            cancelTimeoutTask()
-            callback.call(false, null)
+        thread {
+            try {
+                val buffer = ByteArray(if(mtu > 0) mtu else 1024)
+                val len = bluetoothSocket!!.inputStream.read(buffer)
+                val readData = ByteArray(len)
+                System.arraycopy(buffer, 0, readData, 0, len)
+                cancelTimeoutTask()
+                callback.call(true, readData)
+            } catch (iex: IOException){
+                Timber.e(iex,"$logTag --> readData failed")
+                cancelTimeoutTask()
+                callback.call(false, null)
+            }
         }
     }
 
@@ -277,7 +282,7 @@ internal class ClassicClient(override val context: Context,
 
     private fun BluetoothSocket.safeClose() = try {
         close()
-    } catch (_: Exception){
+    } catch (_: IOException){
 
     }
 

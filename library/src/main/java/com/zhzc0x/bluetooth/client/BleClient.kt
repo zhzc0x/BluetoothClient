@@ -16,6 +16,7 @@ import android.content.Context
 import android.os.Build
 import android.text.TextUtils
 import timber.log.Timber
+import java.io.IOException
 import java.util.Timer
 import java.util.TimerTask
 import java.util.UUID
@@ -138,8 +139,7 @@ internal class BleClient(override val context: Context,
             callConnectState(ConnectState.CONNECT_TIMEOUT)
         }
         val realDevice = bluetoothAdapter!!.getRemoteDevice(device.address)
-        bluetoothGatt?.disconnect()
-        bluetoothGatt?.close()
+        bluetoothGatt?.safeClose()
         bluetoothGatt = when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> {
                 realDevice.connectGatt(context, false, gattCallback,
@@ -159,6 +159,9 @@ internal class BleClient(override val context: Context,
 
     private fun callConnectState(state: ConnectState){
         cancelTimeoutTask()
+        if(state == ConnectState.CONNECT_TIMEOUT || state == ConnectState.CONNECT_ERROR){
+            bluetoothGatt?.safeClose()
+        }
         connectStateCallback.call(state)
     }
 
@@ -295,14 +298,20 @@ internal class BleClient(override val context: Context,
 
     override fun disconnect() {
         if(bluetoothGatt != null){
-            bluetoothGatt?.disconnect()
-            bluetoothGatt?.close()
+            bluetoothGatt?.safeClose()
             bluetoothGatt = null
             receiveDataMap.clear()
             writeDataMap.clear()
             callConnectState(ConnectState.DISCONNECTED)
             Timber.d("$logTag --> 主动 disconnect")
         }
+    }
+
+    private fun BluetoothGatt.safeClose() = try {
+        disconnect()
+        close()
+    } catch (_: IOException){
+
     }
 
     override fun release() {

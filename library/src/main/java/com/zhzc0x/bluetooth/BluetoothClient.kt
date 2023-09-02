@@ -34,6 +34,7 @@ class BluetoothClient(private val context: Context, type: ClientType, serviceUUI
     private var scanDeviceCallback: ScanDeviceCallback? = null
     private var onEndScan: (() -> Unit)? = null
     private var scanTimeMillis: Long = 0
+    private var scanning = false
     @Volatile
     private var drivingDisconnect = false//是否主动断开
     private var curReconnectCount = 0
@@ -73,6 +74,7 @@ class BluetoothClient(private val context: Context, type: ClientType, serviceUUI
             return
         }
         Timber.d("$logTag --> 开始扫描设备")
+        scanning = true
         client.startScan{ device ->
             Timber.d("$logTag --> Scan: $device")
             clientHandler.post { scanDeviceCallback?.call(device) }
@@ -85,7 +87,8 @@ class BluetoothClient(private val context: Context, type: ClientType, serviceUUI
      *
      * */
     fun stopScan(){
-        if(scanDeviceCallback != null){
+        if(scanning){
+            scanning = false
             Timber.d("$logTag --> 停止扫描设备")
             client.stopScan()
             onEndScan?.invoke()
@@ -134,7 +137,7 @@ class BluetoothClient(private val context: Context, type: ClientType, serviceUUI
         if(reconnectMaxCount > 0){
             if(curReconnectCount < reconnectMaxCount){
                 Timber.d("$logTag --> 开始重连count=${++curReconnectCount}")
-                callConnectState(stateCallback, state)
+                callConnectState(stateCallback, ConnectState.RECONNECT)
                 connect(device, mtu, timeoutMillis, reconnectMaxCount, stateCallback)
             } else {
                 Timber.d("$logTag --> 超过最大重连次数，停止重连！")
@@ -277,7 +280,7 @@ class BluetoothClient(private val context: Context, type: ClientType, serviceUUI
                 Timber.d("$logTag --> 开始重读count=${rereadCount + 1}")
                 readData(uuid, timeoutMillis, rereadCount + 1, resendMaxCount, callback)
             } else {
-                Timber.d("$logTag --> 超过最大重发次数，停止重读！")
+                Timber.d("$logTag --> 超过最大重读次数，停止重读！")
                 callback.call(false, null)
             }
         } else {
