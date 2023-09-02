@@ -1,0 +1,64 @@
+// add maven-publish and signing gradle plugin
+apply plugin: 'maven-publish'
+apply plugin: 'signing'
+
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
+
+
+// add publish script
+publishing {
+    publications {
+        mavenKotlin(MavenPublication) {
+
+            groupId = pomGroupId
+            artifactId = pomArtifactId
+            version = pomVersion
+
+            from components.java
+
+            pom {
+                name = 'cxhttp'
+                description = 'Network request framework based on kotlin coroutine and okhttp3 package'
+                url = 'https://github.com/zhzc0x/cxhttp'
+
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'zhzc0x'
+                        name = 'zhangzicheng'
+                        email = 'zhangzicheng2016@gmail.com'
+                    }
+                }
+                scm {
+                    connection = 'https://github.com/zhzc0x/cxhttp.git'
+                    developerConnection = 'https://github.com/zhzc0x/cxhttp.git'
+                    url = 'https://github.com/zhzc0x/cxhttp'
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            def releasesRepoUrl = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
+            def snapshotsRepoUrl = "https://s01.oss.sonatype.org/content/repositories/snapshots/"
+            url = pomVersion.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+            credentials {
+                username ossrhUsername // ossrhUsername is your sonatype username
+                password ossrhPassword // ossrhUsername is your sonatype password
+            }
+        }
+    }
+}
+
+// signing, this need key, secret, we put it into gradle.properties
+signing {
+    sign publishing.publications.mavenKotlin
+}
