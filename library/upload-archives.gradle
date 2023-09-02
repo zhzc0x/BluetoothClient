@@ -2,27 +2,31 @@
 apply plugin: 'maven-publish'
 apply plugin: 'signing'
 
-java {
-    withJavadocJar()
-    withSourcesJar()
+android {
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+            withJavadocJar()
+        }
+    }
 }
-
 
 // add publish script
 publishing {
     publications {
         mavenKotlin(MavenPublication) {
-
             groupId = pomGroupId
             artifactId = pomArtifactId
             version = pomVersion
 
-            from components.java
+            afterEvaluate {
+                from(components["release"])
+            }
 
             pom {
-                name = 'cxhttp'
+                name = 'BluetoothClient'
                 description = 'Network request framework based on kotlin coroutine and okhttp3 package'
-                url = 'https://github.com/zhzc0x/cxhttp'
+                url = 'https://github.com/zhzc0x/BluetoothClient'
 
                 licenses {
                     license {
@@ -38,9 +42,9 @@ publishing {
                     }
                 }
                 scm {
-                    connection = 'https://github.com/zhzc0x/cxhttp.git'
-                    developerConnection = 'https://github.com/zhzc0x/cxhttp.git'
-                    url = 'https://github.com/zhzc0x/cxhttp'
+                    connection = 'https://github.com/zhzc0x/BluetoothClient.git'
+                    developerConnection = 'https://github.com/zhzc0x/BluetoothClient.git'
+                    url = 'https://github.com/zhzc0x/BluetoothClient'
                 }
             }
         }

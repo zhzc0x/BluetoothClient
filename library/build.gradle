@@ -3,12 +3,13 @@ plugins {
     id 'org.jetbrains.kotlin.android'
     id 'maven-publish'
 }
-group = project.groupId
-version = project.versionName
+apply from: "${rootDir}/library/upload-archives.gradle"
+group = project.pomGroupId
+version = project.pomVersion
 
 android {
     compileSdk 33
-    namespace project.groupId
+    namespace project.pomGroupId
 
     defaultConfig {
         minSdk 21
@@ -36,18 +37,4 @@ dependencies {
     implementation 'androidx.core:core-ktx:1.10.1'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
     api 'com.jakewharton.timber:timber:5.0.1'
-}
-
-afterEvaluate {
-    publishing {
-        publications {
-            // Creates a Maven publication called "release".
-            release(MavenPublication) {
-                from components.release
-                groupId = project.groupId
-                artifactId = project.artifactId
-                version = project.versionName
-            }
-        }
-    }
 }
