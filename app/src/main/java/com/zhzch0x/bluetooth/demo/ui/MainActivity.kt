@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,7 +26,6 @@ import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -34,7 +33,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -62,13 +60,9 @@ import com.zhzch0x.bluetooth.demo.bean.LogoutInfo
 import com.zhzch0x.bluetooth.demo.ui.widgets.ScanDeviceDialog
 import com.zhzch0x.bluetooth.demo.ext.toHex
 import com.zhzch0x.bluetooth.demo.ui.widgets.TopBar
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.channelFlow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.internal.ChannelFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.text.SimpleDateFormat
@@ -345,7 +339,8 @@ class MainActivity : ComposeBaseActivity() {
             }
             Row(Modifier.fillMaxWidth().height(36.dp), verticalAlignment = Alignment.CenterVertically) {
                 var ratePackets by remember{ mutableStateOf(0) }
-                Text(text = "Receive每秒包数：$ratePackets", fontSize = 14.sp)
+                Text(text = "Receive每秒包数：", fontSize = 14.sp)
+                Text(text = "$ratePackets", Modifier.defaultMinSize(32.dp), fontSize = 14.sp)
                 LaunchedEffect(deviceName){
                     while(deviceName.isNotEmpty()){
                         receivePackets = 0
@@ -353,7 +348,7 @@ class MainActivity : ComposeBaseActivity() {
                         ratePackets = receivePackets
                     }
                 }
-                Text(text = "修改mtu($mtu)", Modifier.clickable {
+                Text(text = "修改mtu($mtu)", Modifier.padding(start=12.dp).clickable {
                     showChangeMtuDialog = true
                 }.padding(8.dp), fontSize = 14.sp)
             }
@@ -407,7 +402,7 @@ class MainActivity : ComposeBaseActivity() {
                 }, Modifier.height(36.dp)) {
                     Text(text = "读取数据")
                 }
-                Text(text=readDataStr)
+                Text(text=readDataStr, Modifier.padding(start=6.dp))
             }
             if(showChangeMtuDialog){
                 ChangeMtuDialog()
@@ -489,7 +484,7 @@ class MainActivity : ComposeBaseActivity() {
     }
 
     private fun startScanDevice(){
-        bluetoothClient.startScan(30000, onStopScan={
+        bluetoothClient.startScan(30000, onEndScan={
             runOnUiThread(scanDeviceDialog::stopScan)
         }){
             runOnUiThread{

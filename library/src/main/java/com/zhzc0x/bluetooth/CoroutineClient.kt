@@ -67,6 +67,7 @@ class CoroutineClient(private val context: Context, type: ClientType, serviceUUI
 
     suspend fun connect(device: Device, mtu: Int = 0, timeoutMillis: Long = 6000):
             Flow<ConnectState> = withContext(Dispatchers.IO){
+        BluetoothHelper.checkMtuRange(mtu)
         if(!BluetoothHelper.checkBluetoothValid(context, bluetoothAdapter)){
             return@withContext emptyFlow()
         }
@@ -81,8 +82,11 @@ class CoroutineClient(private val context: Context, type: ClientType, serviceUUI
         }
     }
 
-    suspend fun changeMtu(mtu: Int) = withContext(Dispatchers.IO){
-        client.changeMtu(mtu)
+    suspend fun changeMtu(mtu: Int){
+        BluetoothHelper.checkMtuRange(mtu)
+        withContext(Dispatchers.IO){
+            client.changeMtu(mtu)
+        }
     }
 
     suspend fun supportedServices() = withContext(Dispatchers.IO){

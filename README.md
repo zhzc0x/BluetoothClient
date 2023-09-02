@@ -1,2 +1,2 @@
 # BluetoothClient
-Android蓝牙客户端，支持经典蓝牙和低功耗蓝牙BLE，协程Flow扩展CoroutineClient
+Android蓝牙客户端，支持经典蓝牙和低功耗蓝牙BLE，增加协程Flow扩展版本CoroutineClient

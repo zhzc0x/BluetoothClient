@@ -32,7 +32,7 @@ class BluetoothClient(private val context: Context, type: ClientType, serviceUUI
         Handler(ht.looper)
     }
     private var scanDeviceCallback: ScanDeviceCallback? = null
-    private var onStopScan: (() -> Unit)? = null
+    private var onEndScan: (() -> Unit)? = null
     private var scanTimeMillis: Long = 0
     @Volatile
     private var drivingDisconnect = false//是否主动断开
@@ -45,16 +45,29 @@ class BluetoothClient(private val context: Context, type: ClientType, serviceUUI
         }
         BluetoothHelper.registerSwitchStateReceiver(context, stateOn = {
             if(scanDeviceCallback != null){
-                startScan(scanTimeMillis, onStopScan, scanDeviceCallback!!)
+                startScan(scanTimeMillis, onEndScan, scanDeviceCallback!!)
             }
         }, stateOff=::disconnect)
     }
 
+    /**
+     * 设备是否支持蓝牙功能
+     * */
     fun supported() = bluetoothAdapter != null
 
-    fun startScan(timeMillis: Long, onStopScan: (() -> Unit)? = null, deviceCallback: ScanDeviceCallback){
+    /**
+     * 开始扫描设备
+     * @param timeMillis：扫描时长
+     * @param onEndScan：扫描结束回调
+     * @param deviceCallback：ScanDeviceCallback.call(Device):
+     * @See com.zhzc0x.bluetooth.client.Device
+     * @See com.zhzc0x.bluetooth.client.ScanDeviceCallback
+     *
+     * */
+    @JvmOverloads
+    fun startScan(timeMillis: Long, onEndScan: (() -> Unit)? = null, deviceCallback: ScanDeviceCallback){
         scanTimeMillis = timeMillis
-        this.onStopScan = onStopScan
+        this.onEndScan = onEndScan
         scanDeviceCallback = deviceCallback
         if(!BluetoothHelper.checkBluetoothValid(context, bluetoothAdapter)){
             return
@@ -67,18 +80,34 @@ class BluetoothClient(private val context: Context, type: ClientType, serviceUUI
         clientHandler.postDelayed(::stopScan, timeMillis)
     }
 
+    /**
+     * 停止扫描设备
+     *
+     * */
     fun stopScan(){
         if(scanDeviceCallback != null){
             Timber.d("$logTag --> 停止扫描设备")
             client.stopScan()
-            onStopScan?.invoke()
-            onStopScan = null
+            onEndScan?.invoke()
+            onEndScan = null
             scanDeviceCallback = null
         }
     }
 
+    /**
+     * 连接蓝牙设备
+     * @param device: startScan返回的Device
+     * @param mtu: IntRange(23..512)
+     * @param timeoutMillis: 连接超时时间，默认6000ms，超时后回调ConnectState.CONNECT_TIMEOUT
+     * @param reconnectCount: 失败重连次数，默认3次，0不重连
+     * @param stateCallback: 回调ConnectState
+     *
+     * @throws IllegalArgumentException
+     * */
+    @JvmOverloads
     fun connect(device: Device, mtu: Int = 0, timeoutMillis: Long = 6000, reconnectCount: Int = 3,
                 stateCallback: ConnectStateCallback) = clientHandler.post {
+        BluetoothHelper.checkMtuRange(mtu)
         if(!BluetoothHelper.checkBluetoothValid(context, bluetoothAdapter)){
             return@post
         }
@@ -120,7 +149,16 @@ class BluetoothClient(private val context: Context, type: ClientType, serviceUUI
     private fun callConnectState(stateCallback: ConnectStateCallback, state: ConnectState) =
         clientHandler.post { stateCallback.call(state) }
 
+    /**
+     * 修改mtu
+     * @param mtu: IntRange(23..512)
+     *
+     * @return Boolean: true修改成功， false修改失败
+     *
+     * @throws IllegalArgumentException
+     * */
     fun changeMtu(mtu: Int): Boolean{
+        BluetoothHelper.checkMtuRange(mtu)
         return if(client.changeMtu(mtu)){
             Timber.d("$logTag --> mtu修改成功")
             true
@@ -130,16 +168,47 @@ class BluetoothClient(private val context: Context, type: ClientType, serviceUUI
         }
     }
 
+    /**
+     * 获取支持的 services
+     *
+     * @return List<Service>
+     * @see com.zhzc0x.bluetooth.client.Service
+     * */
     fun supportedServices() = client.supportedServices()
 
+    /**
+     * 指定 Service
+     * @param service 通过supportedServices()方法返回的Service
+     * @see com.zhzc0x.bluetooth.client.Service
+     *
+     * */
     fun assignService(service: Service) = client.assignService(service)
 
+    /**
+     * 设置数据接收
+     * @param uuid：低功耗蓝牙传入包含notify特征的uuid，经典蓝牙不需要传
+     * @param onReceive(ByteArray)
+     *
+     * @return Boolean：true设置成功，false设置失败
+     * */
+    @JvmOverloads
     fun receiveData(uuid: UUID? = null, @WorkerThread onReceive: (ByteArray) -> Unit): Boolean {
         return client.receiveData(uuid) { readData ->
             clientHandler.post { onReceive(readData) }
         }
     }
 
+    /**
+     * 发送数据
+     * @param uuid：低功耗蓝牙传入包含write特征的uuid，经典蓝牙不需要传
+     * @param data: ByteArray
+     * @param timeoutMillis: 发送超时时间，默认3000ms
+     * @param resendCount: 失败重发次数，默认3次，0不重发
+     * @param callback: 回调发送结果DataResultCallback.call(Boolean,ByteArray)
+     * @see com.zhzc0x.bluetooth.client.DataResultCallback
+     *
+     * */
+    @JvmOverloads
     fun sendData(uuid: UUID? = null, data: ByteArray, timeoutMillis: Long = 3000,
                  resendCount: Int = 3, callback: DataResultCallback) {
         sendData(uuid, data, timeoutMillis, 0, resendCount, callback)
@@ -173,8 +242,18 @@ class BluetoothClient(private val context: Context, type: ClientType, serviceUUI
         }
     }
 
-    fun readData(uuid: UUID? = null, timeoutMillis: Long = 3000,
-                 rereadCount: Int = 3, callback: DataResultCallback) {
+    /**
+     * 读取数据
+     * @param uuid：低功耗蓝牙传入包含read特征的uuid，经典蓝牙不需要传
+     * @param timeoutMillis: 读取超时时间，默认3000ms
+     * @param rereadCount: 失败重读次数，默认3次，0不重读
+     * @param callback: 回调读取结果DataResultCallback.call(Boolean,ByteArray)
+     * @see com.zhzc0x.bluetooth.client.DataResultCallback
+     *
+     * */
+    @JvmOverloads
+    fun readData(uuid: UUID? = null, timeoutMillis: Long = 3000, rereadCount: Int = 3,
+                 callback: DataResultCallback) {
         readData(uuid, timeoutMillis, 0, rereadCount, callback)
     }
 
@@ -206,6 +285,9 @@ class BluetoothClient(private val context: Context, type: ClientType, serviceUUI
         }
     }
 
+    /**
+     * 断开蓝牙设备
+     * */
     fun disconnect(){
         stopScan()
         drivingDisconnect = true
@@ -213,6 +295,9 @@ class BluetoothClient(private val context: Context, type: ClientType, serviceUUI
         clientHandler.removeCallbacksAndMessages(null)
     }
 
+    /**
+     * 释放资源
+     * */
     fun release(){
         disconnect()
         BluetoothHelper.unregisterSwitchStateReceiver(context)

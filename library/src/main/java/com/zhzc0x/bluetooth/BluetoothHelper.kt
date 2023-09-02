@@ -14,6 +14,7 @@ import android.os.Process
 import android.widget.Toast
 import androidx.core.location.LocationManagerCompat
 import timber.log.Timber
+import java.lang.IllegalArgumentException
 
 internal object BluetoothHelper {
 
@@ -95,6 +96,12 @@ internal object BluetoothHelper {
             }
         }
         return true
+    }
+
+    fun checkMtuRange(mtu: Int){
+        if(mtu < 23 || mtu > 512){
+            throw IllegalArgumentException("The mtu value must be in the 23..512 range")
+        }
     }
 
 }
