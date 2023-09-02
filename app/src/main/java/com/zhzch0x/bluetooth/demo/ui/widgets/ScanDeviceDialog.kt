@@ -32,10 +32,7 @@ class ScanDeviceDialog(uiContext: Context,
             onCancel()
         }
         viewBinding.ivRefresh.setOnClickListener {
-            deviceListAdapter.reset()
-            viewBinding.ivRefresh.visibility = View.GONE
-            viewBinding.progressBar.visibility = View.VISIBLE
-            onStartScan()
+            startScan()
         }
     }
 
@@ -48,12 +45,8 @@ class ScanDeviceDialog(uiContext: Context,
     override fun show() {
         if (!isShowing) {
             super.show()
-            deviceListAdapter.reset()
-            viewBinding.ivRefresh.visibility = View.GONE
-            viewBinding.progressBar.visibility = View.VISIBLE
-            onStartScan()
+            startScan()
         }
-
     }
 
     override fun dismiss() {
@@ -61,6 +54,13 @@ class ScanDeviceDialog(uiContext: Context,
             super.dismiss()
             stopScan()
         }
+    }
+
+    private fun startScan(){
+        deviceListAdapter.reset()
+        viewBinding.ivRefresh.visibility = View.GONE
+        viewBinding.progressBar.visibility = View.VISIBLE
+        onStartScan()
     }
 
     fun stopScan(){
@@ -94,6 +94,7 @@ class ScanDeviceDialog(uiContext: Context,
             if(!deviceInfoList!!.contains(deviceInfo)){
                 deviceInfoList!!.add(0, deviceInfo)
                 notifyItemInserted(0)
+                viewBinding.rvDeviceList.scrollToPosition(0)
             }
         }
 
@@ -104,6 +105,7 @@ class ScanDeviceDialog(uiContext: Context,
 
         fun reset(){
             deviceInfoList?.clear()
+            selectedDevice = null
         }
 
         @SuppressLint("NotifyDataSetChanged")

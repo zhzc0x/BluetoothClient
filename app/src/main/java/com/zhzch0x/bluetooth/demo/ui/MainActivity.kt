@@ -54,6 +54,7 @@ import com.zhzc0x.bluetooth.BluetoothClient
 import com.zhzc0x.bluetooth.client.Characteristic
 import com.zhzc0x.bluetooth.client.ClientType
 import com.zhzc0x.bluetooth.client.ConnectState
+import com.zhzc0x.bluetooth.client.Device
 import com.zhzc0x.bluetooth.client.Service
 import com.zhzc0x.bluetooth.demo.R
 import com.zhzch0x.bluetooth.demo.bean.LogoutInfo
@@ -96,22 +97,7 @@ class MainActivity : ComposeBaseActivity() {
     private var scrollToBottom by mutableStateOf(false)
 
     override fun initData() {
-        scanDeviceDialog = ScanDeviceDialog(this, ::startScanDevice, ::stopScanDevice){
-            bluetoothClient.connect(it, mtu){ connectState ->
-                Timber.d("MainActivity --> connectState: $connectState")
-                showLoading.value = connectState == ConnectState.CONNECTING
-                if(connectState == ConnectState.CONNECTED){
-                    runOnUiThread(scanDeviceDialog::dismiss)
-                    stopScanDevice()
-                    deviceName = it.name ?: it.address
-                    showToast("连接成功！")
-                    supportedServices()
-                } else if(connectState == ConnectState.DISCONNECTED){
-                    deviceName = ""
-                    assignService(null)
-                }
-            }
-        }
+        scanDeviceDialog = ScanDeviceDialog(this, ::startScanDevice, ::stopScanDevice, ::connectDevice)
         val logFlow = channelFlow{
             Timber.plant(object: Timber.Tree(){
                 private val date = Date()
@@ -132,64 +118,7 @@ class MainActivity : ComposeBaseActivity() {
                 }
                 logoutList.add(it)
                 scrollToBottom = !scrollToBottom
-
             }
-        }
-    }
-
-    private fun supportedServices(){
-        serviceList.clear()
-        val services = bluetoothClient.supportedServices()
-        if(services != null){
-            serviceList.addAll(services)
-        }
-        val service = if(serviceList.isNotEmpty()){
-            serviceList.first()
-        } else {
-            null
-        }
-        assignService(service)
-    }
-
-    private fun assignService(service: Service?){
-        this.service = service
-        receiveCharacteristicList.clear()
-        sendCharacteristicList.clear()
-        readCharacteristicList.clear()
-        if(service != null){
-            bluetoothClient.assignService(service)
-            service.characteristics?.forEach { characteristic ->
-                if(characteristic.properties.contains(Characteristic.Property.NOTIFY)){
-                    receiveCharacteristicList.add(characteristic)
-                } else if(characteristic.properties.contains(Characteristic.Property.WRITE)){
-                    sendCharacteristicList.add(characteristic)
-                } else if(characteristic.properties.contains(Characteristic.Property.READ)){
-                    readCharacteristicList.add(characteristic)
-                }
-            }
-            receiveCharacteristic = if(receiveCharacteristicList.isNotEmpty()){
-                receiveCharacteristicList[0]
-            } else {
-                null
-            }
-            sendCharacteristic = if(sendCharacteristicList.isNotEmpty()){
-                sendCharacteristicList[0]
-            } else {
-                null
-            }
-            readCharacteristic = if(readCharacteristicList.isNotEmpty()){
-                readCharacteristicList[0]
-            } else {
-                null
-            }
-        } else {
-            receiveCharacteristic = null
-            sendCharacteristic = null
-            readCharacteristic = null
-            readDataStr = ""
-        }
-        if(receiveCharacteristic != null){
-            receiveData()
         }
     }
 
@@ -266,17 +195,22 @@ class MainActivity : ComposeBaseActivity() {
                 if(deviceName.isNotEmpty()){
                     Row(Modifier.fillMaxWidth().padding(bottom = 14.dp).wrapContentHeight(),
                         verticalAlignment = Alignment.CenterVertically){
-                        var sendText by remember {
-                            mutableStateOf("")
-                        }
+                        var sendText by remember { mutableStateOf("") }
+                        var sendError by remember { mutableStateOf(false) }
                         TextField(sendText, onValueChange = { inputText ->
                             sendText = inputText
+                            sendError = false
                         }, Modifier.fillMaxWidth().weight(1f), singleLine=true, label = {
                             Text(text = "数据格式：任意字符")
-                        })
+                        }, isError = sendError)
                         Spacer(modifier = Modifier.width(12.dp))
                         Button(onClick = {
-                            sendData(sendText.toByteArray())
+                            if(sendText.isNotEmpty()){
+                                sendData(sendText.toByteArray())
+                            } else {
+                                sendError = true
+                            }
+
                         }) {
                             Text(text = "发送")
                         }
@@ -418,7 +352,7 @@ class MainActivity : ComposeBaseActivity() {
     @Composable
     private fun ChangeMtuDialog(){
         Dialog({ showChangeMtuDialog = false }){
-            Column(Modifier.fillMaxWidth().aspectRatio(1.68f)
+            Column(Modifier.fillMaxWidth().aspectRatio(1.6f)
                 .background(Color.White, RoundedCornerShape(4.dp))){
                 Box(Modifier.fillMaxWidth().height(50.dp), contentAlignment = Alignment.Center){
                     Text("修改mtu", fontSize = 16.sp, fontWeight = FontWeight.Bold)
@@ -486,15 +420,89 @@ class MainActivity : ComposeBaseActivity() {
     private fun startScanDevice(){
         bluetoothClient.startScan(30000, onEndScan={
             runOnUiThread(scanDeviceDialog::stopScan)
-        }){
+        }){ device ->
             runOnUiThread{
-                scanDeviceDialog.add(it)
+                scanDeviceDialog.add(device)
             }
         }
     }
 
     private fun stopScanDevice(){
         bluetoothClient.stopScan()
+    }
+
+    private fun connectDevice(device: Device){
+        stopScanDevice()
+        bluetoothClient.connect(device, mtu){ connectState ->
+            Timber.d("MainActivity --> connectState: $connectState")
+            showLoading.value = connectState == ConnectState.CONNECTING
+            if(connectState == ConnectState.CONNECTED){
+                runOnUiThread(scanDeviceDialog::dismiss)
+                stopScanDevice()
+                deviceName = device.name ?: device.address
+                showToast("连接成功！")
+                supportedServices()
+            } else if(connectState == ConnectState.DISCONNECTED){
+                deviceName = ""
+                assignService(null)
+            }
+        }
+    }
+
+    private fun supportedServices(){
+        serviceList.clear()
+        val services = bluetoothClient.supportedServices()
+        if(services != null){
+            serviceList.addAll(services)
+        }
+        val service = if(serviceList.isNotEmpty()){
+            serviceList.first()
+        } else {
+            null
+        }
+        assignService(service)
+    }
+
+    private fun assignService(service: Service?){
+        this.service = service
+        receiveCharacteristicList.clear()
+        sendCharacteristicList.clear()
+        readCharacteristicList.clear()
+        if(service != null){
+            bluetoothClient.assignService(service)
+            service.characteristics?.forEach { characteristic ->
+                if(characteristic.properties.contains(Characteristic.Property.NOTIFY)){
+                    receiveCharacteristicList.add(characteristic)
+                } else if(characteristic.properties.contains(Characteristic.Property.WRITE)){
+                    sendCharacteristicList.add(characteristic)
+                } else if(characteristic.properties.contains(Characteristic.Property.READ)){
+                    readCharacteristicList.add(characteristic)
+                }
+            }
+            receiveCharacteristic = if(receiveCharacteristicList.isNotEmpty()){
+                receiveCharacteristicList[0]
+            } else {
+                null
+            }
+            sendCharacteristic = if(sendCharacteristicList.isNotEmpty()){
+                sendCharacteristicList[0]
+            } else {
+                null
+            }
+            readCharacteristic = if(readCharacteristicList.isNotEmpty()){
+                readCharacteristicList[0]
+            } else {
+                null
+            }
+        } else {
+            receiveCharacteristic = null
+            sendCharacteristic = null
+            readCharacteristic = null
+            readDataStr = ""
+        }
+        if(receiveCharacteristic != null){
+            receiveData()
+        }
     }
 
     private fun receiveData(){
@@ -526,7 +534,7 @@ class MainActivity : ComposeBaseActivity() {
             showToast("请选择ReadUid!")
             return
         }
-        bluetoothClient.readData(readCharacteristic!!.uuid){ success, data ->
+        bluetoothClient.readData(readCharacteristic?.uuid){ success, data ->
             if(success){
                 readDataStr = String(data!!)
                 showToast("数据读取成功！")
