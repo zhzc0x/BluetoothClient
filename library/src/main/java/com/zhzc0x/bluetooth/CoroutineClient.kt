@@ -6,6 +6,7 @@ import android.content.Context
 import com.zhzc0x.bluetooth.client.BleClient
 import com.zhzc0x.bluetooth.client.ClassicClient
 import com.zhzc0x.bluetooth.client.Client
+import com.zhzc0x.bluetooth.client.ClientState
 import com.zhzc0x.bluetooth.client.ClientType
 import com.zhzc0x.bluetooth.client.ConnectState
 import com.zhzc0x.bluetooth.client.Device
@@ -48,9 +49,38 @@ class CoroutineClient(private val context: Context, type: ClientType, serviceUUI
         }, stateOff=::disconnect)
     }
 
-    fun supported() = bluetoothAdapter != null
+    fun checkState(): ClientState {
+        return if(bluetoothAdapter == null){
+            ClientState.UNSUPPORTED
+        } else if(!BluetoothHelper.checkPermissions(context)){
+            ClientState.NO_PERMISSIONS
+        } else if(bluetoothAdapter.isEnabled){
+            ClientState.ENABLE
+        } else {
+            BluetoothHelper.switchBluetooth(context, bluetoothAdapter, enabled = true)
+            ClientState.DISABLE
+        }
+    }
 
-   suspend fun startScan(timeMillis: Long, onEndScan: (() -> Unit)? = null): Flow<Device>{
+    fun enabled(): Boolean{
+        return if(bluetoothAdapter != null){
+            BluetoothHelper.switchBluetooth(context, bluetoothAdapter, enabled = true,
+                checkPermission = true)
+        } else {
+            false
+        }
+    }
+
+    fun disable(): Boolean{
+        return if(bluetoothAdapter != null){
+            BluetoothHelper.switchBluetooth(context, bluetoothAdapter, enabled = false,
+                checkPermission = true)
+        } else {
+            false
+        }
+    }
+
+    suspend fun startScan(timeMillis: Long, onEndScan: (() -> Unit)? = null): Flow<Device>{
        if(!BluetoothHelper.checkBluetoothValid(context, bluetoothAdapter)){
            return emptyFlow()
        }

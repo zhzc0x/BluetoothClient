@@ -42,6 +42,10 @@ enum class ClientType{
     CLASSIC, BLE
 }
 
+enum class ClientState{
+    UNSUPPORTED, NO_PERMISSIONS, ENABLE, DISABLE
+}
+
 data class Device(val address: String,
                   val name: String?,
                   val type: Type){

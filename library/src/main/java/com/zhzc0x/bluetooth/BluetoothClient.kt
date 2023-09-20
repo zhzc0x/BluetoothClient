@@ -1,5 +1,6 @@
 package com.zhzc0x.bluetooth
 
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
@@ -9,6 +10,7 @@ import androidx.annotation.WorkerThread
 import com.zhzc0x.bluetooth.client.BleClient
 import com.zhzc0x.bluetooth.client.ClassicClient
 import com.zhzc0x.bluetooth.client.Client
+import com.zhzc0x.bluetooth.client.ClientState
 import com.zhzc0x.bluetooth.client.ClientType
 import com.zhzc0x.bluetooth.client.ConnectState
 
@@ -52,9 +54,50 @@ class BluetoothClient(private val context: Context, type: ClientType, serviceUUI
     }
 
     /**
-     * 设备是否支持蓝牙功能
+     * 检查设备蓝牙状态
+     * @return ClientState
+     * @see com.zhzc0x.bluetooth.client.ClientState
      * */
-    fun supported() = bluetoothAdapter != null
+    fun checkState(): ClientState {
+        return if(bluetoothAdapter == null){
+            ClientState.UNSUPPORTED
+        } else if(!BluetoothHelper.checkPermissions(context)){
+            ClientState.NO_PERMISSIONS
+        } else if(bluetoothAdapter.isEnabled){
+            ClientState.ENABLE
+        } else {
+            BluetoothHelper.switchBluetooth(context, bluetoothAdapter, enabled = true)
+            ClientState.DISABLE
+        }
+    }
+
+    /**
+     * 开启蓝牙
+     * 此系统方法在 API 级别 33 中已弃用。从 Build.VERSION_CODES.TIRAMISU 开始，不允许应用程序启用/禁用蓝牙
+     * 并总是返回false
+     * */
+    fun enabled(): Boolean{
+        return if(bluetoothAdapter != null){
+            BluetoothHelper.switchBluetooth(context, bluetoothAdapter, enabled = true,
+                checkPermission = true)
+        } else {
+            false
+        }
+    }
+
+    /**
+     * 关闭蓝牙
+     * 此系统方法在 API 级别 33 中已弃用。从 Build.VERSION_CODES.TIRAMISU 开始，不允许应用程序启用/禁用蓝牙
+     * 并总是返回false
+     * */
+    fun disable(): Boolean{
+        return if(bluetoothAdapter != null){
+            BluetoothHelper.switchBluetooth(context, bluetoothAdapter, enabled = false,
+                checkPermission = true)
+        } else {
+            false
+        }
+    }
 
     /**
      * 开始扫描设备

@@ -1,6 +1,11 @@
 package com.zhzch0x.bluetooth.demo.ui
 
+import android.os.Bundle
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +20,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -25,22 +31,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import com.zhzc0x.bluetooth.CoroutineClient
+import com.zhzc0x.bluetooth.client.ClientState
 import com.zhzc0x.bluetooth.client.ClientType
 import com.zhzc0x.bluetooth.client.ConnectState
 import com.zhzc0x.bluetooth.client.Device
 import com.zhzch0x.bluetooth.demo.ext.toHex
-import com.zhzch0x.bluetooth.demo.ui.widgets.ScanDeviceDialog
-import com.zhzch0x.bluetooth.demo.ui.widgets.TopBar
+import com.zhzch0x.bluetooth.demo.ui.theme.BluetoothClientTheme
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.UUID
 
-class CoroutineClientActivity: ComposeBaseActivity() {
+class CoroutineClientActivity: ComponentActivity() {
 
     private val serviceUid: UUID = UUID.fromString("0000ffe0-0000-1000-8000-00805f9b34fb")
     private val receiveUid: UUID = UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb")
@@ -51,15 +58,26 @@ class CoroutineClientActivity: ComposeBaseActivity() {
     private lateinit var scanDeviceDialog: ScanDeviceDialog
     private var deviceName by mutableStateOf("")
 
-    override fun initData() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
         scanDeviceDialog = ScanDeviceDialog(this, ::startScanDevice, ::stopScanDevice, ::connectDevice)
+        setContent {
+            BluetoothClientTheme{
+                Content()
+            }
+        }
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    override fun Content() {
+    private fun Content() {
         Scaffold(Modifier.fillMaxSize(), topBar = {
-            TopBar(title = "BluetoothClient", showBackButton = false)
+            Surface(shadowElevation=2.5.dp) {
+                Box(Modifier.fillMaxWidth().height(44.dp)){
+                    Text("BluetoothClient", Modifier.align(Alignment.Center), fontSize = 18.sp,
+                        fontWeight= FontWeight.Medium, textAlign= TextAlign.Center)
+                }
+            }
         }){ paddingValues ->
             Column(Modifier.padding(start = 14.dp, top=paddingValues.calculateTopPadding(), end=14.dp)) {
                 Row(
@@ -85,10 +103,17 @@ class CoroutineClientActivity: ComposeBaseActivity() {
                     Spacer(modifier = Modifier.width(4.dp))
                     if(deviceName.isEmpty()){
                         Button(onClick = {
-                            if(bluetoothClient.supported()){
-                                scanDeviceDialog.show()
-                            } else {
-                                showSnackBar("当前设备不支持蓝牙功能！")
+                            when(bluetoothClient.checkState()){
+                                ClientState.UNSUPPORTED -> {
+                                    showToast("当前设备不支持蓝牙功能！")
+                                }
+                                ClientState.DISABLE -> {
+                                    showToast("请先开启蓝牙！")
+                                }
+                                ClientState.ENABLE -> {
+                                    scanDeviceDialog.show()
+                                }
+                                else  -> {}
                             }
                         }) {
                             Text(text = "扫描设备", fontSize = 16.sp)
@@ -153,7 +178,7 @@ class CoroutineClientActivity: ComposeBaseActivity() {
         lifecycleScope.launch {
            bluetoothClient.connect(device, 85, 15000).collect{ connectState ->
                Timber.d("CoroutineClientActivity --> connectState: $connectState")
-               showLoading.value = connectState == ConnectState.CONNECTING
+//               showLoading.value = connectState == ConnectState.CONNECTING
                if(connectState == ConnectState.CONNECTED){
                    scanDeviceDialog.dismiss()
                    stopScanDevice()
@@ -187,6 +212,12 @@ class CoroutineClientActivity: ComposeBaseActivity() {
             } else {
                 showToast("数据发送失败！")
             }
+        }
+    }
+
+    private fun showToast(msg: String){
+        runOnUiThread {
+            Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
         }
     }
 

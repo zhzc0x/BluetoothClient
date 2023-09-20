@@ -1,4 +1,4 @@
-package com.zhzch0x.bluetooth.demo.ui.widgets
+package com.zhzch0x.bluetooth.demo.ui
 
 import android.annotation.SuppressLint
 import android.content.Context

@@ -55,5 +55,4 @@ dependencies {
     implementation("androidx.compose.material3:material3")
 
     implementation project(':library')
-    implementation("com.zhzc0x.bluetooth:client-android:1.0.0")
 }

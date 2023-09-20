@@ -61,8 +61,7 @@ internal object BluetoothHelper {
             return false
         }
         if (!bluetoothAdapter.isEnabled) {
-            Timber.d("$logTag --> 请求打开蓝牙")
-            bluetoothAdapter.enable()
+            switchBluetooth(context, bluetoothAdapter, true)
             return false
         }
         if(Build.VERSION.SDK_INT < Build.VERSION_CODES.S){
@@ -73,6 +72,29 @@ internal object BluetoothHelper {
         }
         return true
     }
+
+    @SuppressLint("MissingPermission")
+    fun switchBluetooth(context: Context, bluetoothAdapter: BluetoothAdapter,
+                        enabled: Boolean, checkPermission: Boolean = false): Boolean{
+        if(checkPermission && !checkPermissions(context)){
+            return false
+        }
+        //Android13及以上不允许App启用/关闭蓝牙
+        if(Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU){
+            if(enabled){
+                Timber.d("$logTag --> 请求开启蓝牙")
+                @Suppress("DEPRECATION")
+                return bluetoothAdapter.enable()
+            } else {
+                Timber.d("$logTag --> 请求关闭蓝牙")
+                @Suppress("DEPRECATION")
+                return bluetoothAdapter.disable()
+            }
+        }
+        return false
+    }
+
+
 
     fun registerSwitchStateReceiver(context: Context, stateOn: () -> Unit, stateOff: () -> Unit){
         this.stateOn = stateOn
@@ -85,10 +107,11 @@ internal object BluetoothHelper {
         context.unregisterReceiver(bluetoothReceiver)
     }
 
-    private fun checkPermissions(context: Context): Boolean {
+    fun checkPermissions(context: Context): Boolean {
         for (permission in permissions) {
             val grant = context.checkPermission(permission, Process.myPid(), Process.myUid())
             if (grant != PackageManager.PERMISSION_GRANTED) {
+                Timber.d("$logTag --> 缺少权限$permission, 尝试申请...")
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     (context as Activity).requestPermissions(permissions, 1200)
                 }
