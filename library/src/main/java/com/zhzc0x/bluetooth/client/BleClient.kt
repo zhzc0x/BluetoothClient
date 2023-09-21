@@ -9,6 +9,7 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothGattService
 import android.bluetooth.BluetoothProfile
+import android.bluetooth.BluetoothStatusCodes
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
@@ -29,6 +30,12 @@ internal class BleClient(override val context: Context,
                          override val bluetoothAdapter: BluetoothAdapter?,
                          override var serviceUUID: UUID?,
                          override val logTag: String) : Client {
+
+    override var writeType: Int = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+    } else {
+        -1
+    }
 
     private lateinit var scanDeviceCallback: ScanDeviceCallback
     private lateinit var connectStateCallback: ConnectStateCallback
@@ -58,7 +65,7 @@ internal class BleClient(override val context: Context,
 
     override fun stopScan() {
         if(bluetoothAdapter != null){
-            bluetoothAdapter.bluetoothLeScanner!!.stopScan(scanCallback)
+            bluetoothAdapter.bluetoothLeScanner?.stopScan(scanCallback)
         }
     }
 
@@ -99,21 +106,46 @@ internal class BleClient(override val context: Context,
             }
         }
 
+        @Deprecated("Deprecated in Java")
         override fun onCharacteristicChanged(gatt: BluetoothGatt,
                                              characteristic: BluetoothGattCharacteristic) {
+            @Suppress("DEPRECATION")
             receiveDataMap[characteristic.uuid]?.invoke(characteristic.value)
         }
 
-        override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic:
-        BluetoothGattCharacteristic, status: Int) {
-            Timber.d("$logTag --> onCharacteristicWrite: value=${String(characteristic.value)}, status=$status")
-            callSendDataResult(characteristic.value, status == BluetoothGatt.GATT_SUCCESS)
+        override fun onCharacteristicChanged(gatt: BluetoothGatt,
+                                             characteristic: BluetoothGattCharacteristic,
+                                             value: ByteArray) {
+            receiveDataMap[characteristic.uuid]?.invoke(value)
         }
 
-        override fun onCharacteristicRead(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic,
-            status: Int) {
-            Timber.d("$logTag --> onCharacteristicRead: value=${characteristic.value.contentToString()}, status=$status")
-            callReadDataResult(characteristic.uuid, status == BluetoothGatt.GATT_SUCCESS, characteristic.value)
+        override fun onCharacteristicWrite(gatt: BluetoothGatt,
+                                           characteristic: BluetoothGattCharacteristic, status: Int) {
+            @Suppress("DEPRECATION")
+            val value = characteristic.value
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                Timber.d("$logTag --> onCharacteristicWrite: value=${String(value)}, status=$status")
+                callSendDataResult(value, status == BluetoothGatt.GATT_SUCCESS)
+            } else {
+                //api33及以上获取不到value
+                Timber.d("$logTag --> onCharacteristicWrite: value=${value ?: null}, status=$status")
+            }
+        }
+
+        @Deprecated("Deprecated in Java")
+        override fun onCharacteristicRead(gatt: BluetoothGatt,
+                                          characteristic: BluetoothGattCharacteristic, status: Int) {
+            @Suppress("DEPRECATION")
+            val value = characteristic.value
+            Timber.d("$logTag --> onCharacteristicRead: value=${value.contentToString()}, status=$status")
+            callReadDataResult(characteristic.uuid, status == BluetoothGatt.GATT_SUCCESS, value)
+        }
+
+        override fun onCharacteristicRead(gatt: BluetoothGatt,
+                                          characteristic: BluetoothGattCharacteristic,
+                                          value: ByteArray, status: Int) {
+            Timber.d("$logTag --> onCharacteristicRead2: value=${value.contentToString()}, status=$status")
+            callReadDataResult(characteristic.uuid, status == BluetoothGatt.GATT_SUCCESS, value)
         }
 
         override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
@@ -176,11 +208,11 @@ internal class BleClient(override val context: Context,
         return bluetoothGatt?.services?.map { getGattService ->
             Service(getGattService.uuid, Service.typeOf(getGattService.type),
                 getGattService.characteristics.map {
-                    Characteristic(it.uuid, Characteristic.getProperties(it.properties))
+                    Characteristic(it.uuid, Characteristic.getProperties(it.properties), it.permissions)
                 },getGattService.includedServices.map { includedService ->
                     Service(includedService.uuid, Service.typeOf(includedService.type),
                         includedService.characteristics.map {
-                            Characteristic(it.uuid, Characteristic.getProperties(it.properties))
+                            Characteristic(it.uuid, Characteristic.getProperties(it.properties), it.permissions)
                         },null)
                 })
         }
@@ -218,8 +250,14 @@ internal class BleClient(override val context: Context,
         val notificationResult = bluetoothGatt!!.setCharacteristicNotification(readCharacteristic, true)
         Timber.d("$logTag --> receiveData: notificationResult=$notificationResult")
         readCharacteristic.descriptors.forEach {
-            it.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-            bluetoothGatt!!.writeDescriptor(it)
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                @Suppress("DEPRECATION")
+                it.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                @Suppress("DEPRECATION")
+                bluetoothGatt!!.writeDescriptor(it)
+            } else {
+                bluetoothGatt!!.writeDescriptor(it, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
+            }
         }
         return notificationResult
     }
@@ -237,10 +275,25 @@ internal class BleClient(override val context: Context,
         }
         val writeCharacteristic = gattService.getCharacteristic(uuid)
         if(writeCharacteristic != null){
-            writeCharacteristic.value = data
-            if(!bluetoothGatt!!.writeCharacteristic(writeCharacteristic)){
-                Timber.e("$logTag --> sendData: writeCharacteristic=false")
-                callSendDataResult(data, false)
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                @Suppress("DEPRECATION")
+                writeCharacteristic.value = data
+                if(writeType != -1){
+                    writeCharacteristic.writeType = writeType
+                }
+                @Suppress("DEPRECATION")
+                if(!bluetoothGatt!!.writeCharacteristic(writeCharacteristic)){
+                    Timber.e("$logTag --> sendData: writeCharacteristic=false")
+                    callSendDataResult(data, false)
+                }
+            } else {
+                val result = bluetoothGatt!!.writeCharacteristic(writeCharacteristic, data, writeType)
+                Timber.e("$logTag --> sendData: writeCharacteristic=$result")
+                if(result == BluetoothStatusCodes.SUCCESS){
+                    callSendDataResult(data, true)
+                } else {
+                    callSendDataResult(data, false)
+                }
             }
         } else {
             Timber.e("$logTag --> sendData: getCharacteristic($uuid)=null")
@@ -303,7 +356,6 @@ internal class BleClient(override val context: Context,
             receiveDataMap.clear()
             writeDataMap.clear()
             callConnectState(ConnectState.DISCONNECTED)
-            Timber.d("$logTag --> 主动 disconnect")
         }
     }
 

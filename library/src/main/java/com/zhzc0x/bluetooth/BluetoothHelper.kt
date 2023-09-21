@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Process
 import android.widget.Toast
 import androidx.core.location.LocationManagerCompat
+import com.zhzc0x.bluetooth.client.ClientState
 import timber.log.Timber
 import java.lang.IllegalArgumentException
 
@@ -51,17 +52,13 @@ internal object BluetoothHelper {
         arrayOf(android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.BLUETOOTH_CONNECT)
     }
 
-    @SuppressLint("MissingPermission")
     fun checkBluetoothValid(context: Context, bluetoothAdapter: BluetoothAdapter?): Boolean{
-        if(bluetoothAdapter == null){
-            Timber.d("$logTag --> 当前设备不支持蓝牙功能！")
-            return false
-        }
-        if(!checkPermissions(context)){
-            return false
-        }
-        if (!bluetoothAdapter.isEnabled) {
-            switchBluetooth(context, bluetoothAdapter, true)
+        val state = checkState(context, bluetoothAdapter, true)
+        if(state != ClientState.ENABLE){
+            if(state == ClientState.DISABLE){
+                //尝试请求开启蓝牙
+                switchBluetooth(context, bluetoothAdapter!!, true)
+            }
             return false
         }
         if(Build.VERSION.SDK_INT < Build.VERSION_CODES.S){
@@ -71,6 +68,26 @@ internal object BluetoothHelper {
             }
         }
         return true
+    }
+
+    fun checkState(context: Context, bluetoothAdapter: BluetoothAdapter?,
+                   requestPermission: Boolean): ClientState {
+        val state = when {
+            bluetoothAdapter == null -> {
+                ClientState.UNSUPPORTED
+            }
+            !checkPermissions(context, requestPermission) -> {
+                ClientState.NO_PERMISSIONS
+            }
+            bluetoothAdapter.isEnabled -> {
+                ClientState.ENABLE
+            }
+            else -> {
+                ClientState.DISABLE
+            }
+        }
+        Timber.d("$logTag --> checkState: $state")
+        return state
     }
 
     @SuppressLint("MissingPermission")
@@ -94,31 +111,35 @@ internal object BluetoothHelper {
         return false
     }
 
-
-
-    fun registerSwitchStateReceiver(context: Context, stateOn: () -> Unit, stateOff: () -> Unit){
+    fun registerSwitchReceiver(context: Context, stateOn: () -> Unit, stateOff: () -> Unit){
         this.stateOn = stateOn
         this.stateOff = stateOff
         context.registerReceiver(bluetoothReceiver, IntentFilter(
             BluetoothAdapter.ACTION_STATE_CHANGED))
     }
 
-    fun unregisterSwitchStateReceiver(context: Context) {
+    fun unregisterSwitchReceiver(context: Context) {
         context.unregisterReceiver(bluetoothReceiver)
     }
 
-    fun checkPermissions(context: Context): Boolean {
+    private fun checkPermissions(context: Context, request: Boolean = true): Boolean {
         for (permission in permissions) {
             val grant = context.checkPermission(permission, Process.myPid(), Process.myUid())
             if (grant != PackageManager.PERMISSION_GRANTED) {
                 Timber.d("$logTag --> 缺少权限$permission, 尝试申请...")
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    (context as Activity).requestPermissions(permissions, 1200)
+                if (request && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    requestPermissions(context)
                 }
                 return false
             }
         }
         return true
+    }
+
+    fun requestPermissions(context: Context){
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            (context as Activity).requestPermissions(permissions, 1200)
+        }
     }
 
     fun checkMtuRange(mtu: Int){

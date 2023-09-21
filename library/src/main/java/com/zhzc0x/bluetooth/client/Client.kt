@@ -11,6 +11,7 @@ internal interface Client {
     val bluetoothAdapter: BluetoothAdapter?
     val logTag: String
     var serviceUUID: UUID?
+    var writeType: Int
 
     fun startScan(callback: ScanDeviceCallback)
 
@@ -95,7 +96,8 @@ data class Service(val uuid: UUID,
 }
 
 data class Characteristic(val uuid: UUID,
-                          val properties: List<Property>){
+                          val properties: List<Property>,
+                          val permissions: Int){
     enum class Property(val value: Int){
         BROADCAST(1), EXTENDED_PROPS(128), INDICATE(32), NOTIFY(16),
         READ(2), SIGNED_WRITE(64), WRITE(8), WRITE_NO_RESPONSE(4),

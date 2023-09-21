@@ -9,7 +9,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
-import android.text.TextUtils
 import timber.log.Timber
 import java.io.IOException
 import java.util.Timer
@@ -25,6 +24,8 @@ internal class ClassicClient(override val context: Context,
                              override val bluetoothAdapter: BluetoothAdapter?,
                              override var serviceUUID: UUID?,
                              override val logTag: String) : Client {
+
+    override var writeType: Int = -1
 
     private lateinit var scanDeviceCallback: ScanDeviceCallback
     private lateinit var connectStateCallback: ConnectStateCallback
@@ -276,7 +277,6 @@ internal class ClassicClient(override val context: Context,
             bluetoothSocket = null
             realDevice = null
             callConnectState(ConnectState.DISCONNECTED)
-            Timber.d("$logTag --> 主动 disconnect")
         }
     }
 
