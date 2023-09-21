@@ -1,6 +1,7 @@
 package com.zhzch0x.bluetooth.demo.ui
 
 import android.os.Bundle
+import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -43,6 +44,7 @@ import com.zhzc0x.bluetooth.client.ConnectState
 import com.zhzc0x.bluetooth.client.Device
 import com.zhzch0x.bluetooth.demo.ext.toHex
 import com.zhzch0x.bluetooth.demo.ui.theme.BluetoothClientTheme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.UUID
@@ -55,11 +57,13 @@ class CoroutineClientActivity: ComponentActivity() {
 
     private var bluetoothType by mutableStateOf(ClientType.BLE)
     private lateinit var bluetoothClient: CoroutineClient
+    private lateinit var loadingDialog: LoadingDialog
     private lateinit var scanDeviceDialog: ScanDeviceDialog
     private var deviceName by mutableStateOf("")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        loadingDialog = LoadingDialog(this, false)
         scanDeviceDialog = ScanDeviceDialog(this, ::startScanDevice, ::stopScanDevice, ::connectDevice)
         setContent {
             BluetoothClientTheme{
@@ -80,8 +84,7 @@ class CoroutineClientActivity: ComponentActivity() {
             }
         }){ paddingValues ->
             Column(Modifier.padding(start = 14.dp, top=paddingValues.calculateTopPadding(), end=14.dp)) {
-                Row(
-                    Modifier.padding(top = 12.dp).height(40.dp),
+                Row(Modifier.padding(top = 12.dp).height(40.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     var expanded by remember {
                         mutableStateOf(false)
@@ -101,6 +104,8 @@ class CoroutineClientActivity: ComponentActivity() {
                         }
                     }
                     Spacer(modifier = Modifier.width(4.dp))
+                }
+                Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically){
                     if(deviceName.isEmpty()){
                         Button(onClick = {
                             when(bluetoothClient.checkState()){
@@ -158,6 +163,11 @@ class CoroutineClientActivity: ComponentActivity() {
         LaunchedEffect(bluetoothType){
             bluetoothClient = CoroutineClient(this@CoroutineClientActivity, bluetoothType,
                 serviceUid)
+            bluetoothClient.switchReceiver(on={
+                scanDeviceDialog.show()
+            }, off={
+                scanDeviceDialog.stopScan()
+            })
         }
     }
 
@@ -176,14 +186,17 @@ class CoroutineClientActivity: ComponentActivity() {
     private fun connectDevice(device: Device){
         stopScanDevice()
         lifecycleScope.launch {
-           bluetoothClient.connect(device, 85, 15000).collect{ connectState ->
+           bluetoothClient.connect(device, 85, 15000, 3).collect{ connectState ->
                Timber.d("CoroutineClientActivity --> connectState: $connectState")
-//               showLoading.value = connectState == ConnectState.CONNECTING
+               if(connectState == ConnectState.CONNECTING){
+                   loadingDialog.show()
+               } else {
+                   loadingDialog.hide()
+               }
                if(connectState == ConnectState.CONNECTED){
-                   scanDeviceDialog.dismiss()
-                   stopScanDevice()
                    deviceName = device.name ?: device.address
                    receiveData()
+                   scanDeviceDialog.dismiss()
                    showToast("连接成功！")
                } else if(connectState == ConnectState.DISCONNECTED){
                    deviceName = ""
@@ -219,6 +232,11 @@ class CoroutineClientActivity: ComponentActivity() {
         runOnUiThread {
             Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        bluetoothClient.release()
     }
 
 }

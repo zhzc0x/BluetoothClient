@@ -16,7 +16,7 @@ import com.zhzc0x.bluetooth.demo.databinding.ItemScanDeviceBinding
 
 class ScanDeviceDialog(uiContext: Context,
                        private val onStartScan: () -> Unit,
-                       private val onCancel: () -> Unit,
+                       private val onStopScan: () -> Unit,
                        private val onSelectDevice: (Device) -> Unit): AlertDialog(uiContext) {
 
     private val deviceListAdapter = DeviceListAdapter()
@@ -29,10 +29,18 @@ class ScanDeviceDialog(uiContext: Context,
         viewBinding.rvDeviceList.layoutManager = layoutManager
         viewBinding.rvDeviceList.adapter = deviceListAdapter
         setButton(DialogInterface.BUTTON_NEGATIVE, "取消"){ _, _ ->
-            onCancel()
+            onStopScan()
         }
         viewBinding.ivRefresh.setOnClickListener {
             startScan()
+        }
+        viewBinding.flLoading.setOnClickListener {
+            if(viewBinding.progressBar.visibility == View.VISIBLE){
+                onStopScan()
+                stopScan()
+            } else {
+                startScan()
+            }
         }
     }
 
