@@ -20,8 +20,8 @@ import java.lang.IllegalArgumentException
 internal object BluetoothHelper {
 
     var logTag = "BluetoothHelper"
-    private lateinit var stateOn: () -> Unit
-    private lateinit var stateOff: () -> Unit
+    private lateinit var turnOn: () -> Unit
+    private lateinit var turnOff: () -> Unit
     private val bluetoothReceiver = object: BroadcastReceiver(){
         override fun onReceive(context: Context, intent: Intent) {
             if(intent.action == BluetoothAdapter.ACTION_STATE_CHANGED){
@@ -31,11 +31,11 @@ internal object BluetoothHelper {
                     }
                     BluetoothAdapter.STATE_ON -> {
                         Timber.d("$logTag --> 蓝牙已经打开。")
-                        stateOn()
+                        turnOn()
                     }
                     BluetoothAdapter.STATE_TURNING_OFF -> {
                         Timber.d("$logTag --> 蓝牙正在关闭...")
-                        stateOff()
+                        turnOff()
                     }
                     BluetoothAdapter.STATE_OFF -> {
                         Timber.d("$logTag --> 蓝牙已经关闭。")
@@ -74,7 +74,7 @@ internal object BluetoothHelper {
                    requestPermission: Boolean): ClientState {
         val state = when {
             bluetoothAdapter == null -> {
-                ClientState.UNSUPPORTED
+                ClientState.NOT_SUPPORT
             }
             !checkPermissions(context, requestPermission) -> {
                 ClientState.NO_PERMISSIONS
@@ -92,13 +92,13 @@ internal object BluetoothHelper {
 
     @SuppressLint("MissingPermission")
     fun switchBluetooth(context: Context, bluetoothAdapter: BluetoothAdapter,
-                        enabled: Boolean, checkPermission: Boolean = false): Boolean{
+                        enable: Boolean, checkPermission: Boolean = false): Boolean{
         if(checkPermission && !checkPermissions(context)){
             return false
         }
         //Android13及以上不允许App启用/关闭蓝牙
         if(Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU){
-            if(enabled){
+            if(enable){
                 Timber.d("$logTag --> 请求开启蓝牙")
                 @Suppress("DEPRECATION")
                 return bluetoothAdapter.enable()
@@ -111,9 +111,9 @@ internal object BluetoothHelper {
         return false
     }
 
-    fun registerSwitchReceiver(context: Context, stateOn: () -> Unit, stateOff: () -> Unit){
-        this.stateOn = stateOn
-        this.stateOff = stateOff
+    fun registerSwitchReceiver(context: Context, turnOn: () -> Unit, turnOff: () -> Unit){
+        this.turnOn = turnOn
+        this.turnOff = turnOff
         context.registerReceiver(bluetoothReceiver, IntentFilter(
             BluetoothAdapter.ACTION_STATE_CHANGED))
     }

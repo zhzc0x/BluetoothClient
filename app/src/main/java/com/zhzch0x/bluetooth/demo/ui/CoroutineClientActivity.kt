@@ -109,7 +109,7 @@ class CoroutineClientActivity: ComponentActivity() {
                     if(deviceName.isEmpty()){
                         Button(onClick = {
                             when(bluetoothClient.checkState()){
-                                ClientState.UNSUPPORTED -> {
+                                ClientState.NOT_SUPPORT -> {
                                     showToast("当前设备不支持蓝牙功能！")
                                 }
                                 ClientState.DISABLE -> {
@@ -163,9 +163,9 @@ class CoroutineClientActivity: ComponentActivity() {
         LaunchedEffect(bluetoothType){
             bluetoothClient = CoroutineClient(this@CoroutineClientActivity, bluetoothType,
                 serviceUid)
-            bluetoothClient.switchReceiver(on={
+            bluetoothClient.setSwitchReceiver(turnOn={
                 scanDeviceDialog.show()
-            }, off={
+            }, turnOff={
                 scanDeviceDialog.stopScan()
             })
         }

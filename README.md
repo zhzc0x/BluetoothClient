@@ -66,8 +66,22 @@ lifecycleScope.launch {
 API说明
 
 ```kotlin
-/** 设备是否支持蓝牙功能 */          
-fun supported()
+/**                                                          
+ * 检查设备蓝牙状态                                                  
+ * @param toNext: true 如何无蓝牙权限则继续请求权限，如果设备蓝牙未开启则继续请求打开；false 无操作
+ * @return ClientState                                       
+ * @see com.zhzc0x.bluetooth.client.ClientState              
+ * */                                                        
+fun checkState(toNext: Boolean = true): ClientState
+
+/** 设置蓝牙开关状态通知 */                                             
+fun setSwitchReceiver(turnOn: () -> Unit, turnOff: () -> Unit)
+
+/**                                                                                
+ * 开关蓝牙                                                                            
+ * 此系统方法在 API 级别 33 中已弃用。从 Build.VERSION_CODES.TIRAMISU 开始，不允许应用程序启用/禁用蓝牙并总是返回false
+ * */                                                                              
+fun switch(enable: Boolean): Boolean
 
 /**                                                                                                 
  * 开始扫描设备                                                                                           
@@ -92,7 +106,7 @@ fun stopScan()
  * @param reconnectCount: 失败重连次数，默认3次，0不重连                                                    
  * @param stateCallback: 回调ConnectState                                                       
  *                                                                                            
- * @throws IllegalArgumentException                                                           
+ * @throws IllegalArgumentException("The mtu value must be in the 23..512 range")          
  * */                                                                                         
 @JvmOverloads                                                                                 
 fun connect(device: Device, mtu: Int = 0, timeoutMillis: Long = 6000, reconnectCount: Int = 3, stateCallback: 		ConnectStateCallback)
@@ -103,7 +117,7 @@ fun connect(device: Device, mtu: Int = 0, timeoutMillis: Long = 6000, reconnectC
  *                                     
  * @return Boolean: true修改成功， false修改失败
  *                                     
- * @throws IllegalArgumentException    
+ * @throws IllegalArgumentException("The mtu value must be in the 23..512 range")    
  * */                                  
 fun changeMtu(mtu: Int): Boolean
 
@@ -122,6 +136,14 @@ fun supportedServices(): List<Service>
  *                                 
  * */                              
 fun assignService(service: Service)
+
+/**                                                                                      
+ * 设置写特征类型                                                                               
+ * @param type：默认-1不设置，其他值同 WRITE_TYPE_DEFAULT, WRITE_TYPE_NO_RESPONSE, WRITE_TYPE_SIGNED
+ * @see android.bluetooth.BluetoothGattCharacteristic                                    
+ *                                                                                       
+ * */                                                                                    
+fun setWriteType(type: Int)
 
 /**                                                                                       
  * 设置数据接收                                                                                 

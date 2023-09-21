@@ -28,13 +28,13 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
     protected val logTag: String = this::class.java.simpleName
     private val client: Client
     private val bluetoothAdapter: BluetoothAdapter? = (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
-    protected val clientHandler: Handler by lazy {
+    private val clientHandler: Handler by lazy {
         val ht = HandlerThread("clientHandler")
         ht.start()
         Handler(ht.looper)
     }
-    private var switchOn: (() -> Unit)? = null
-    private var switchOff: (() -> Unit)? = null
+    private var turnOn: (() -> Unit)? = null
+    private var turnOff: (() -> Unit)? = null
     private var onEndScan: (() -> Unit)? = null
     @Volatile
     protected var drivingDisconnect = false//是否主动断开
@@ -46,26 +46,18 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
             ClientType.BLE -> BleClient(context, bluetoothAdapter, serviceUUID, logTag)
         }
         BluetoothHelper.logTag = logTag
-        BluetoothHelper.registerSwitchReceiver(context, stateOn = {
-            switchOn?.invoke()
-        }, stateOff={
+        BluetoothHelper.registerSwitchReceiver(context, turnOn = {
+            turnOn?.invoke()
+        }, turnOff={
             disconnect()
-            switchOff?.invoke()
+            turnOff?.invoke()
         })
     }
 
     /**
-     * 设置蓝牙开关状态通知
-     * */
-    fun switchReceiver(on: () -> Unit, off: () -> Unit){
-        this.switchOn = on
-        this.switchOff = off
-    }
-
-    /**
      * 检查设备蓝牙状态
-     * @param toNext: true 如何没有蓝牙权限，请求权限，如果设备蓝牙未开启，请求开启；false 无操作
-     * @return ClientState
+     * @param toNext: true 如何无蓝牙权限则继续请求权限，如果设备蓝牙未开启则继续请求打开；false 无操作
+     * @return ClientState：NOT_SUPPORT, NO_PERMISSIONS, ENABLE, DISABLE
      * @see com.zhzc0x.bluetooth.client.ClientState
      * */
     fun checkState(toNext: Boolean = true): ClientState{
@@ -78,33 +70,24 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
                 BluetoothHelper.requestPermissions(context)
             }
         } else if(state == ClientState.DISABLE){
-            clientHandler.post { enabled() }
+            clientHandler.post { switch(true) }
         }
         return state
     }
 
-    /**
-     * 开启蓝牙
-     * 此系统方法在 API 级别 33 中已弃用。从 Build.VERSION_CODES.TIRAMISU 开始，不允许应用程序启用/禁用蓝牙
-     * 并总是返回false
-     * */
-    fun enabled(): Boolean{
-        return if(bluetoothAdapter != null){
-            BluetoothHelper.switchBluetooth(context, bluetoothAdapter, enabled = true,
-                checkPermission = true)
-        } else {
-            false
-        }
+    /** 设置蓝牙开关状态通知 */
+    fun setSwitchReceiver(turnOn: () -> Unit, turnOff: () -> Unit){
+        this.turnOn = turnOn
+        this.turnOff = turnOff
     }
-
+    
     /**
-     * 关闭蓝牙
-     * 此系统方法在 API 级别 33 中已弃用。从 Build.VERSION_CODES.TIRAMISU 开始，不允许应用程序启用/禁用蓝牙
-     * 并总是返回false
+     * 开关蓝牙
+     * 此系统方法在 API 级别 33 中已弃用。从 Build.VERSION_CODES.TIRAMISU 开始，不允许应用程序启用/禁用蓝牙并总是返回false
      * */
-    fun disable(): Boolean{
+    fun switch(enable: Boolean): Boolean{
         return if(bluetoothAdapter != null){
-            BluetoothHelper.switchBluetooth(context, bluetoothAdapter, enabled = false,
+            BluetoothHelper.switchBluetooth(context, bluetoothAdapter, enable,
                 checkPermission = true)
         } else {
             false
