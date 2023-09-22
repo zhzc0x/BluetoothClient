@@ -95,8 +95,10 @@ class CoroutineClientActivity: ComponentActivity() {
                             DropdownMenuItem(text = {
                                 Text(text = "$clientType", fontSize = 16.sp)
                             }, onClick = {
-                                bluetoothClient.release()
-                                bluetoothType = clientType
+                                if(bluetoothType != clientType){
+                                    bluetoothClient.release()
+                                    bluetoothType = clientType
+                                }
                                 expanded = false
                             })
                         }
