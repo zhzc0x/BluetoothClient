@@ -1,10 +1,14 @@
 package com.zhzc0x.bluetooth
 
+import android.app.Activity
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
+import android.content.Intent
 import android.os.Handler
 import android.os.HandlerThread
+import android.provider.Settings
+import android.widget.Toast
 import androidx.annotation.CallSuper
 import androidx.annotation.WorkerThread
 import com.zhzc0x.bluetooth.client.BleClient
@@ -56,8 +60,9 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
 
     /**
      * 检查设备蓝牙状态
-     * @param toNext: true 如何无蓝牙权限则继续请求权限，如果设备蓝牙未开启则继续请求打开；false 无操作
-     * @return ClientState：NOT_SUPPORT, NO_PERMISSIONS, ENABLE, DISABLE
+     * @param toNext: true 如无蓝牙权限则继续请求权限，如设备蓝牙未开启则继续请求打开，如未开启定位开关（Android12以下需要）则前往设置；
+     *                false 无操作
+     * @return ClientState： NOT_SUPPORT, NO_PERMISSIONS, LOCATION_DISABLE, ENABLE, DISABLE
      * @see com.zhzc0x.bluetooth.client.ClientState
      * */
     fun checkState(toNext: Boolean = true): ClientState{
@@ -65,18 +70,30 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
         if(!toNext){
             return state
         }
-        if(state == ClientState.NO_PERMISSIONS){
-            clientHandler.post { 
-                BluetoothHelper.requestPermissions(context)
+        when (state) {
+            ClientState.NO_PERMISSIONS -> {
+                clientHandler.post { BluetoothHelper.requestPermissions(context) }
             }
-        } else if(state == ClientState.DISABLE){
-            clientHandler.post { switch(true) }
+            ClientState.DISABLE -> {
+                clientHandler.post { switch(true) }
+            }
+            ClientState.LOCATION_DISABLE -> {
+                (context as Activity).startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                Toast.makeText(context, "当前设备蓝牙服务需要开启定位服务！", Toast.LENGTH_SHORT).show()
+            } 
+            else -> {}
         }
         return state
     }
+    
+    private fun checkValid(): Boolean{
+        val state = checkState(true)
+        Timber.d("${BluetoothHelper.logTag} --> checkState: $state")
+        return state == ClientState.ENABLE
+    }
 
     /** 设置蓝牙开关状态通知 */
-    fun setSwitchReceiver(turnOn: () -> Unit, turnOff: () -> Unit){
+    fun setSwitchReceive(turnOn: () -> Unit, turnOff: () -> Unit){
         this.turnOn = turnOn
         this.turnOff = turnOff
     }
@@ -105,7 +122,7 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
      * */
     @JvmOverloads
     fun startScan(timeMillis: Long, onEndScan: (() -> Unit)? = null, deviceCallback: ScanDeviceCallback): Boolean{
-        if(!BluetoothHelper.checkBluetoothValid(context, bluetoothAdapter)){
+        if(!checkValid()){
             return false
         }
         this.onEndScan = onEndScan
@@ -147,7 +164,7 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
     fun connect(device: Device, mtu: Int = 0, timeoutMillis: Long = 6000, reconnectCount: Int = 3,
                 stateCallback: ConnectStateCallback): Boolean{
         BluetoothHelper.checkMtuRange(mtu)
-        if(!BluetoothHelper.checkBluetoothValid(context, bluetoothAdapter)){
+        if(!checkValid()){
             return false
         }
         return clientHandler.post {

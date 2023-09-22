@@ -52,24 +52,6 @@ internal object BluetoothHelper {
         arrayOf(android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.BLUETOOTH_CONNECT)
     }
 
-    fun checkBluetoothValid(context: Context, bluetoothAdapter: BluetoothAdapter?): Boolean{
-        val state = checkState(context, bluetoothAdapter, true)
-        if(state != ClientState.ENABLE){
-            if(state == ClientState.DISABLE){
-                //尝试请求开启蓝牙
-                switchBluetooth(context, bluetoothAdapter!!, true)
-            }
-            return false
-        }
-        if(Build.VERSION.SDK_INT < Build.VERSION_CODES.S){
-            if(!LocationManagerCompat.isLocationEnabled(context.getSystemService(Context.LOCATION_SERVICE) as LocationManager)){
-                Toast.makeText(context, "当前设备蓝牙服务需要开启定位服务！", Toast.LENGTH_SHORT).show()
-                return false
-            }
-        }
-        return true
-    }
-
     fun checkState(context: Context, bluetoothAdapter: BluetoothAdapter?,
                    requestPermission: Boolean): ClientState {
         val state = when {
@@ -79,6 +61,11 @@ internal object BluetoothHelper {
             !checkPermissions(context, requestPermission) -> {
                 ClientState.NO_PERMISSIONS
             }
+            //Android12之后就不需要定位权限了
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.S && !LocationManagerCompat.isLocationEnabled(context
+                        .getSystemService(Context.LOCATION_SERVICE) as LocationManager) -> {
+                ClientState.LOCATION_DISABLE
+            }
             bluetoothAdapter.isEnabled -> {
                 ClientState.ENABLE
             }
@@ -86,13 +73,12 @@ internal object BluetoothHelper {
                 ClientState.DISABLE
             }
         }
-        Timber.d("$logTag --> checkState: $state")
         return state
     }
 
     @SuppressLint("MissingPermission")
-    fun switchBluetooth(context: Context, bluetoothAdapter: BluetoothAdapter,
-                        enable: Boolean, checkPermission: Boolean = false): Boolean{
+    fun switchBluetooth(context: Context, bluetoothAdapter: BluetoothAdapter, enable: Boolean,
+                        checkPermission: Boolean = false): Boolean{
         if(checkPermission && !checkPermissions(context)){
             return false
         }

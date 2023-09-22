@@ -20,7 +20,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.zhzc0x.bluetooth:client-android:1.0.0")
+    implementation("com.zhzc0x.bluetooth:client-android:1.0.1")
 }
 ```
 
@@ -68,14 +68,15 @@ API说明
 ```kotlin
 /**                                                          
  * 检查设备蓝牙状态                                                  
- * @param toNext: true 如何无蓝牙权限则继续请求权限，如果设备蓝牙未开启则继续请求打开；false 无操作
- * @return ClientState                                       
+ * @param toNext: true 如无蓝牙权限则继续请求权限，如设备蓝牙未开启则继续请求打开，如未开启定位开关（Android12以下需要）则前往设置；
+ *                false 无操作
+ * @return ClientState： NOT_SUPPORT, NO_PERMISSIONS, LOCATION_DISABLE, ENABLE, DISABLE                                       
  * @see com.zhzc0x.bluetooth.client.ClientState              
  * */                                                        
 fun checkState(toNext: Boolean = true): ClientState
 
 /** 设置蓝牙开关状态通知 */                                             
-fun setSwitchReceiver(turnOn: () -> Unit, turnOff: () -> Unit)
+fun setSwitchReceive(turnOn: () -> Unit, turnOff: () -> Unit)
 
 /**                                                                                
  * 开关蓝牙                                                                            

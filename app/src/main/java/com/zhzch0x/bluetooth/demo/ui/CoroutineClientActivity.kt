@@ -1,7 +1,6 @@
 package com.zhzch0x.bluetooth.demo.ui
 
 import android.os.Bundle
-import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -44,7 +43,6 @@ import com.zhzc0x.bluetooth.client.ConnectState
 import com.zhzc0x.bluetooth.client.Device
 import com.zhzch0x.bluetooth.demo.ext.toHex
 import com.zhzch0x.bluetooth.demo.ui.theme.BluetoothClientTheme
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.UUID
@@ -163,7 +161,7 @@ class CoroutineClientActivity: ComponentActivity() {
         LaunchedEffect(bluetoothType){
             bluetoothClient = CoroutineClient(this@CoroutineClientActivity, bluetoothType,
                 serviceUid)
-            bluetoothClient.setSwitchReceiver(turnOn={
+            bluetoothClient.setSwitchReceive(turnOn={
                 scanDeviceDialog.show()
             }, turnOff={
                 scanDeviceDialog.stopScan()

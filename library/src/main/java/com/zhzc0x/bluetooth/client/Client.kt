@@ -44,7 +44,7 @@ enum class ClientType{
 }
 
 enum class ClientState{
-    NOT_SUPPORT, NO_PERMISSIONS, ENABLE, DISABLE
+    NOT_SUPPORT, NO_PERMISSIONS, LOCATION_DISABLE, ENABLE, DISABLE
 }
 
 data class Device(val address: String,
