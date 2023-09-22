@@ -12,7 +12,7 @@ Android蓝牙客户端，支持经典蓝牙和低功耗蓝牙BLE，增加协程F
 
 # Demo
 
-[Compose版蓝牙助手，基于当前库开发]: https://github.com/zhzc0x/BluetoothAssistant
+Compose版蓝牙助手，基于当前库开发: https://github.com/zhzc0x/BluetoothAssistant
 
 # 使用
 
