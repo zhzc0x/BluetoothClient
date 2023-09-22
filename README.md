@@ -10,6 +10,10 @@ Android蓝牙客户端，支持经典蓝牙和低功耗蓝牙BLE，增加协程F
 - 支持BLE设置多个notifyUid监听数据
 - 支持ChannelFlow
 
+# Demo
+
+[Compose版蓝牙助手，基于当前库开发]: https://github.com/zhzc0x/BluetoothAssistant	"BluetoothAssistant"
+
 # 使用
 
 添加gradle依赖
