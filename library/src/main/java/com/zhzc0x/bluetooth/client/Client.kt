@@ -1,6 +1,8 @@
 package com.zhzc0x.bluetooth.client
 
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.content.Context
 import androidx.annotation.WorkerThread
 import java.util.UUID
@@ -47,15 +49,21 @@ enum class ClientState{
     NOT_SUPPORT, NO_PERMISSIONS, LOCATION_DISABLE, ENABLE, DISABLE
 }
 
-data class Device(val address: String,
+data class Device internal constructor(val address: String,
                   val name: String?,
-                  val type: Type){
+                  val type: Type,
+                  val bonded: Boolean){
+
+    @SuppressLint("MissingPermission")
+    internal constructor(device: BluetoothDevice, bonded: Boolean) :
+            this(device.address, device.name, typeOf(device.type), bonded)
+
     enum class Type(val value: Int){
         CLASSIC(1), BLE(2), DUAL(3), UNKNOWN(-1);
     }
 
     companion object{
-        fun typeOf(value: Int): Type{
+        private fun typeOf(value: Int): Type{
             Type.values().forEach {
                 if(it.value == value){
                     return it

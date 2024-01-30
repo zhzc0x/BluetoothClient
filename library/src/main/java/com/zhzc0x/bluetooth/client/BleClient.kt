@@ -53,7 +53,7 @@ internal class BleClient(override val context: Context,
             if(TextUtils.isEmpty(device?.name)){
                 return
             }
-            scanDeviceCallback.call(Device(device.address, device.name, Device.typeOf(device.type)))
+            scanDeviceCallback.call(Device(device, false))
         }
     }
 

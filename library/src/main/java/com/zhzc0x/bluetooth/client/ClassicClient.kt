@@ -50,7 +50,7 @@ internal class ClassicClient(override val context: Context,
                     if(device == null){
                         return
                     }
-                    scanDeviceCallback.call(Device(device.address, device.name, Device.typeOf(device.type)))
+                    scanDeviceCallback.call(Device(device, device.bondState == BluetoothDevice.BOND_BONDED))
                 }
                 BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
                     disconnect()
@@ -83,7 +83,7 @@ internal class ClassicClient(override val context: Context,
         bluetoothAdapter!!.startDiscovery()
         bluetoothAdapter.bondedDevices.forEach {
             Timber.d("$logTag --> 已配对设备：$it, ${it.uuids.size}, ${it.fetchUuidsWithSdp()}")
-            scanDeviceCallback.call(Device(it.address, it.name, Device.typeOf(it.type)))
+            scanDeviceCallback.call(Device(it, true))
         }
 
     }
