@@ -25,7 +25,7 @@ publishing {
 
             pom {
                 name = 'BluetoothClient'
-                description = 'Network request framework based on kotlin coroutine and okhttp3 package'
+                description = 'Android bluetooth client, supports classic bluetooth and low energy bluetooth BLE, supports coroutine flow version'
                 url = 'https://github.com/zhzc0x/BluetoothClient'
 
                 licenses {
