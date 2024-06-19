@@ -54,9 +54,23 @@ publishing {
             def releasesRepoUrl = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
             def snapshotsRepoUrl = "https://s01.oss.sonatype.org/content/repositories/snapshots/"
             url = pomVersion.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+
+            def userId = ""
+            def userToken = ""
+            File file = rootProject.file('local.properties')
+            if (file.exists()) {
+                def properties = new Properties()
+                properties.load(rootProject.file('local.properties').newDataInputStream())
+                if (properties.containsKey("userId")) {
+                    userId = properties.getProperty("userId")
+                }
+                if (properties.containsKey("userToken")) {
+                    userToken = properties.getProperty("userToken")
+                }
+            }
             credentials {
-                username ossrhUsername // ossrhUsername is your sonatype username
-                password ossrhPassword // ossrhUsername is your sonatype password
+                username userId // ossrhUsername is your sonatype username
+                password userToken // ossrhUsername is your sonatype password
             }
         }
     }

@@ -9,5 +9,4 @@
 .cxx
 local.properties
 
-gradle.properties
 library/mavenSign.gpg
