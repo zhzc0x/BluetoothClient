@@ -82,7 +82,7 @@ internal class ClassicClient(override val context: Context,
         registerStateReceiver()
         bluetoothAdapter!!.startDiscovery()
         bluetoothAdapter.bondedDevices.forEach {
-            Timber.d("$logTag --> 已配对设备：$it, ${it.uuids.size}, ${it.fetchUuidsWithSdp()}")
+            Timber.d("$logTag --> 已配对设备：$it, uuids=${it.uuids?.contentToString()}")
             scanDeviceCallback.call(Device(it, true))
         }
 
