@@ -49,23 +49,25 @@ enum class ClientState{
     NOT_SUPPORT, NO_PERMISSIONS, LOCATION_DISABLE, ENABLE, DISABLE
 }
 
-data class Device internal constructor(val address: String,
-                  val name: String?,
-                  val type: Type,
-                  val bonded: Boolean){
+data class Device internal constructor(
+    val address: String,
+    val name: String?,
+    val type: Type,
+    val bonded: Boolean
+) {
 
     @SuppressLint("MissingPermission")
     internal constructor(device: BluetoothDevice, bonded: Boolean) :
             this(device.address, device.name, typeOf(device.type), bonded)
 
-    enum class Type(val value: Int){
+    enum class Type(val value: Int) {
         CLASSIC(1), BLE(2), DUAL(3), UNKNOWN(-1);
     }
 
-    companion object{
-        private fun typeOf(value: Int): Type{
-            Type.values().forEach {
-                if(it.value == value){
+    companion object {
+        private fun typeOf(value: Int): Type {
+            Type.entries.forEach {
+                if (it.value == value) {
                     return it
                 }
             }
@@ -82,17 +84,19 @@ fun interface ScanDeviceCallback {
 
 }
 
-data class Service(val uuid: UUID,
-                   val type: Type,
-                   val characteristics: List<Characteristic>?,
-                   val included: List<Service>?){
-    enum class Type(val value: Int){
+data class Service(
+    val uuid: UUID,
+    val type: Type,
+    val characteristics: List<Characteristic>?,
+    val included: List<Service>?
+){
+    enum class Type(val value: Int) {
         PRIMARY(0), SECONDARY(1), UNKNOWN(-1);
     }
 
-    companion object{
+    companion object {
         fun typeOf(value: Int): Type {
-            Service.Type.values().forEach {
+            Service.Type.entries.forEach {
                 if(it.value == value){
                     return it
                 }
@@ -105,17 +109,17 @@ data class Service(val uuid: UUID,
 
 data class Characteristic(val uuid: UUID,
                           val properties: List<Property>,
-                          val permissions: Int){
-    enum class Property(val value: Int){
+                          val permissions: Int) {
+    enum class Property(val value: Int) {
         BROADCAST(1), EXTENDED_PROPS(128), INDICATE(32), NOTIFY(16),
         READ(2), SIGNED_WRITE(64), WRITE(8), WRITE_NO_RESPONSE(4),
         UNKNOWN(-1);
     }
 
-    companion object{
+    companion object {
 
-        fun getProperties(value: Int): List<Property>{
-            return Property.values().filter { property ->
+        fun getProperties(value: Int): List<Property> {
+            return Property.entries.filter { property ->
                 (value and property.value) == property.value
             }
         }
@@ -124,7 +128,7 @@ data class Characteristic(val uuid: UUID,
 
 }
 
-enum class ConnectState(private val desc: String){
+enum class ConnectState(private val desc: String) {
     CONNECTING("连接中"),
     CONNECT_TIMEOUT("连接超时"),
     CONNECTED("已连接"),
@@ -133,14 +137,14 @@ enum class ConnectState(private val desc: String){
     RECONNECT("重新连接");
 }
 
-fun interface ConnectStateCallback{
+fun interface ConnectStateCallback {
 
     @WorkerThread
     fun call(state: ConnectState)
 
 }
 
-fun interface DataResultCallback{
+fun interface DataResultCallback {
 
     @WorkerThread
     fun call(success: Boolean, data: ByteArray?)

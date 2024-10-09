@@ -45,7 +45,7 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
     protected var curReconnectCount = 0
 
     init {
-        client = when(type){
+        client = when(type) {
             ClientType.CLASSIC -> ClassicClient(context, bluetoothAdapter, serviceUUID, logTag)
             ClientType.BLE -> BleClient(context, bluetoothAdapter, serviceUUID, logTag)
         }
@@ -65,9 +65,9 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
      * @return ClientState： NOT_SUPPORT, NO_PERMISSIONS, LOCATION_DISABLE, ENABLE, DISABLE
      * @see com.zhzc0x.bluetooth.client.ClientState
      * */
-    fun checkState(toNext: Boolean = true): ClientState{
+    fun checkState(toNext: Boolean = true): ClientState {
         val state = BluetoothHelper.checkState(context, bluetoothAdapter, false)
-        if(!toNext){
+        if (!toNext) {
             return state
         }
         when (state) {
@@ -86,14 +86,14 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
         return state
     }
     
-    private fun checkValid(): Boolean{
+    private fun checkValid(): Boolean {
         val state = checkState(true)
         Timber.d("${BluetoothHelper.logTag} --> checkState: $state")
         return state == ClientState.ENABLE
     }
 
     /** 设置蓝牙开关状态通知 */
-    fun setSwitchReceive(turnOn: () -> Unit, turnOff: () -> Unit){
+    fun setSwitchReceive(turnOn: () -> Unit, turnOff: () -> Unit) {
         this.turnOn = turnOn
         this.turnOff = turnOff
     }
@@ -102,8 +102,8 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
      * 开关蓝牙
      * 此系统方法在 API 级别 33 中已弃用。从 Build.VERSION_CODES.TIRAMISU 开始，不允许应用程序启用/禁用蓝牙并总是返回false
      * */
-    fun switch(enable: Boolean): Boolean{
-        return if(bluetoothAdapter != null){
+    fun switch(enable: Boolean): Boolean {
+        return if (bluetoothAdapter != null) {
             BluetoothHelper.switchBluetooth(context, bluetoothAdapter, enable,
                 checkPermission = true)
         } else {
@@ -121,17 +121,17 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
      *
      * */
     @JvmOverloads
-    fun startScan(timeMillis: Long, onEndScan: (() -> Unit)? = null, deviceCallback: ScanDeviceCallback): Boolean{
-        if(!checkValid()){
+    fun startScan(timeMillis: Long, onEndScan: (() -> Unit)? = null, deviceCallback: ScanDeviceCallback): Boolean {
+        if (!checkValid()) {
             return false
         }
         this.onEndScan = onEndScan
         Timber.d("$logTag --> 开始扫描设备")
-        client.startScan{ device ->
+        client.startScan { device ->
             Timber.d("$logTag --> Scan: $device")
             clientHandler.post { deviceCallback.call(device) }
         }
-        if(timeMillis > 0){
+        if (timeMillis > 0) {
             clientHandler.postDelayed(::stopScan, timeMillis)
         }
         return true
@@ -141,8 +141,8 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
      * 停止扫描设备
      *
      * */
-    @CallSuper open fun stopScan(){
-        if(onEndScan != null){
+    @CallSuper open fun stopScan() {
+        if (onEndScan != null) {
             Timber.d("$logTag --> 停止扫描设备, ${Thread.currentThread().name}")
             client.stopScan()
             onEndScan?.invoke()
@@ -162,20 +162,20 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
      * */
     @JvmOverloads
     fun connect(device: Device, mtu: Int = 0, timeoutMillis: Long = 6000, reconnectCount: Int = 3,
-                stateCallback: ConnectStateCallback): Boolean{
+                stateCallback: ConnectStateCallback): Boolean {
         BluetoothHelper.checkMtuRange(mtu)
-        if(!checkValid()){
+        if (!checkValid()) {
             return false
         }
         return clientHandler.post {
-            client.connect(device, mtu, timeoutMillis){ state ->
+            client.connect(device, mtu, timeoutMillis) { state ->
                 Timber.d("$logTag --> connectState: $state")
-                if(state == ConnectState.DISCONNECTED && !drivingDisconnect){
+                if (state == ConnectState.DISCONNECTED && !drivingDisconnect) {
                     Timber.d("$logTag --> 被动 disconnect，可以尝试重连")
                     checkToReconnect(device, mtu, timeoutMillis, reconnectCount, stateCallback, state)
-                } else if(state == ConnectState.CONNECT_ERROR || state == ConnectState.CONNECT_TIMEOUT){
+                } else if (state == ConnectState.CONNECT_ERROR || state == ConnectState.CONNECT_TIMEOUT) {
                     checkToReconnect(device, mtu, timeoutMillis, reconnectCount, stateCallback, state)
-                } else if(state == ConnectState.CONNECTED){
+                } else if (state == ConnectState.CONNECTED) {
                     drivingDisconnect = false
                     curReconnectCount = 0
                     callConnectState(stateCallback, state)
@@ -188,9 +188,9 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
 
     private fun checkToReconnect(device: Device, mtu: Int, timeoutMillis: Long,
                                  reconnectMaxCount: Int, stateCallback: ConnectStateCallback,
-                                 state: ConnectState){
-        if(reconnectMaxCount > 0){
-            if(curReconnectCount < reconnectMaxCount){
+                                 state: ConnectState) {
+        if (reconnectMaxCount > 0) {
+            if (curReconnectCount < reconnectMaxCount) {
                 Timber.d("$logTag --> 开始重连count=${++curReconnectCount}")
                 callConnectState(stateCallback, ConnectState.RECONNECT)
                 connect(device, mtu, timeoutMillis, reconnectMaxCount, stateCallback)
@@ -215,9 +215,9 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
      *
      * @throws IllegalArgumentException("The mtu value must be in the 23..512 range")
      * */
-    fun changeMtu(mtu: Int): Boolean{
+    fun changeMtu(mtu: Int): Boolean {
         BluetoothHelper.checkMtuRange(mtu)
-        return if(client.changeMtu(mtu)){
+        return if (client.changeMtu(mtu)) {
             Timber.d("$logTag --> mtu修改成功")
             true
         } else {
@@ -248,7 +248,7 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
      * @see android.bluetooth.BluetoothGattCharacteristic
      *
      * */
-    fun setWriteType(type: Int){
+    fun setWriteType(type: Int) {
         client.writeType = type
     }
 
@@ -284,8 +284,8 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
 
     private fun sendData(uuid: UUID?, data: ByteArray, timeoutMillis: Long, resendCount: Int,
                          resendMaxCount: Int, callback: DataResultCallback) = clientHandler.post {
-        client.sendData(uuid, data, timeoutMillis){ success, _ ->
-            if(!success){
+        client.sendData(uuid, data, timeoutMillis) { success, _ ->
+            if (!success) {
                 Timber.d("$logTag --> sendData failed: ${String(data)}")
                 checkToResend(uuid, data, timeoutMillis, resendCount, resendMaxCount, callback)
             } else {
@@ -296,9 +296,9 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
     }
 
     private fun checkToResend(uuid: UUID?, data: ByteArray, timeoutMillis: Long, resendCount: Int,
-                              resendMaxCount: Int, callback: DataResultCallback){
-        if(resendMaxCount > 0){
-            if(resendCount < resendMaxCount){
+                              resendMaxCount: Int, callback: DataResultCallback) {
+        if (resendMaxCount > 0) {
+            if (resendCount < resendMaxCount) {
                 Timber.d("$logTag --> 开始重发count=${resendCount + 1}")
                 sendData(uuid, data, timeoutMillis, resendCount + 1, resendMaxCount, callback)
             } else {
@@ -327,8 +327,8 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
 
     private fun readData(uuid: UUID?, timeoutMillis: Long, rereadCount: Int,
                          resendMaxCount: Int, callback: DataResultCallback) = clientHandler.post {
-        client.readData(uuid, timeoutMillis){ success, data ->
-            if(!success){
+        client.readData(uuid, timeoutMillis) { success, data ->
+            if (!success) {
                 Timber.d("$logTag --> readData failed")
                 checkToReread(uuid, timeoutMillis, rereadCount, resendMaxCount, callback)
             } else {
@@ -339,9 +339,9 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
     }
 
     private fun checkToReread(uuid: UUID?, timeoutMillis: Long, rereadCount: Int,
-                              resendMaxCount: Int, callback: DataResultCallback){
-        if(resendMaxCount > 0){
-            if(rereadCount < resendMaxCount){
+                              resendMaxCount: Int, callback: DataResultCallback) {
+        if (resendMaxCount > 0) {
+            if (rereadCount < resendMaxCount) {
                 Timber.d("$logTag --> 开始重读count=${rereadCount + 1}")
                 readData(uuid, timeoutMillis, rereadCount + 1, resendMaxCount, callback)
             } else {
@@ -356,7 +356,7 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
     /**
      * 断开蓝牙设备
      * */
-    @CallSuper open fun disconnect(){
+    @CallSuper open fun disconnect() {
         stopScan()
         drivingDisconnect = true
         clientHandler.removeCallbacksAndMessages(null)
@@ -367,7 +367,7 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
     /**
      * 释放资源
      * */
-    fun release(){
+    fun release() {
         disconnect()
         BluetoothHelper.unregisterSwitchReceiver(context)
         client.release()

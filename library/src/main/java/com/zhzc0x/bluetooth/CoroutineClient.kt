@@ -19,16 +19,19 @@ import timber.log.Timber
 import java.util.UUID
 import kotlin.coroutines.resume
 
-class CoroutineClient(context: Context, type: ClientType, serviceUUID: UUID?):
-    BluetoothClient(context, type, serviceUUID) {
+class CoroutineClient(
+    context: Context,
+    type: ClientType,
+    serviceUUID: UUID?
+): BluetoothClient(context, type, serviceUUID) {
 
     private var scanDeviceChannel: SendChannel<Device>? = null
     private var connectStateChannel: SendChannel<ConnectState>? = null
     private var receiveDataChannel: SendChannel<ByteArray>? = null
 
-    suspend fun startScan(timeMillis: Long, onEndScan: (() -> Unit)? = null): Flow<Device>{
+    fun startScan(timeMillis: Long, onEndScan: (() -> Unit)? = null): Flow<Device> {
        return channelFlow {
-           if(startScan(0, onEndScan, ::trySend)){
+           if (startScan(0, onEndScan, ::trySend)) {
                scanDeviceChannel = channel
                delay(timeMillis)
                withContext(Dispatchers.Main) {
@@ -40,31 +43,31 @@ class CoroutineClient(context: Context, type: ClientType, serviceUUID: UUID?):
 
     override fun stopScan() {
         super.stopScan()
-        if(scanDeviceChannel != null){
+        if (scanDeviceChannel != null) {
             scanDeviceChannel?.close()
             scanDeviceChannel = null
         }
     }
 
-    suspend fun connect(device: Device, mtu: Int = 0, timeoutMillis: Long = 6000,
-                        reconnectCount: Int = 3): Flow<ConnectState>{
+    fun connect(device: Device, mtu: Int = 0, timeoutMillis: Long = 6000,
+                        reconnectCount: Int = 3): Flow<ConnectState> {
         curReconnectCount = 0
-        val connectFlow = channelFlow{
-            if(connect(device, mtu, timeoutMillis, 0) { state ->
-                    if(reconnectCount > 0){
-                        trySendToClose(state, reconnectCount)
-                    } else {
-                        trySend(state)
-                    }
-                }){
+        val connectFlow = channelFlow {
+            if (connect(device, mtu, timeoutMillis, 0) { state ->
+                if (reconnectCount > 0) {
+                    trySendToClose(state, reconnectCount)
+                } else {
+                    trySend(state)
+                }
+            }) {
                 connectStateChannel = channel
-                awaitClose{
+                awaitClose {
                     Timber.d("$logTag --> connectFlow closed")
                 }
             }
         }.flowOn(Dispatchers.IO)
-        return if(reconnectCount > 0){
-            connectFlow.retryWhen{ _, _ ->
+        return if (reconnectCount > 0) {
+            connectFlow.retryWhen { _, _ ->
                 Timber.d("$logTag --> 开始重连count=$curReconnectCount")
                 true
             }
@@ -74,9 +77,9 @@ class CoroutineClient(context: Context, type: ClientType, serviceUUID: UUID?):
     }
 
     private fun ProducerScope<ConnectState>.trySendToClose(state: ConnectState, reconnectCount: Int) {
-        if((state == ConnectState.DISCONNECTED && !drivingDisconnect) ||
-            state == ConnectState.CONNECT_ERROR || state == ConnectState.CONNECT_TIMEOUT){
-            if(curReconnectCount >= reconnectCount){
+        if ((state == ConnectState.DISCONNECTED && !drivingDisconnect) ||
+            state == ConnectState.CONNECT_ERROR || state == ConnectState.CONNECT_TIMEOUT) {
+            if (curReconnectCount >= reconnectCount) {
                 Timber.d("$logTag --> 超过最大重连次数，停止重连！")
                 trySend(state)
                 disconnect()
@@ -84,10 +87,10 @@ class CoroutineClient(context: Context, type: ClientType, serviceUUID: UUID?):
                 trySend(ConnectState.RECONNECT)
                 close(RuntimeException("设备连接异常: $state, 尝试重连${++curReconnectCount}"))
             }
-        } else if(state == ConnectState.CONNECTED){
+        } else if (state == ConnectState.CONNECTED) {
             curReconnectCount = 0
             trySend(state)
-        } else if(state == ConnectState.DISCONNECTED){
+        } else if (state == ConnectState.DISCONNECTED) {
             trySend(state)
             connectStateChannel?.close()
         } else {
@@ -95,11 +98,11 @@ class CoroutineClient(context: Context, type: ClientType, serviceUUID: UUID?):
         }
     }
 
-    suspend fun receiveData(uuid: UUID? = null): Flow<ByteArray>{
+    fun receiveData(uuid: UUID? = null): Flow<ByteArray> {
         return channelFlow {
-            if(receiveData(uuid, ::trySend)){
+            if (receiveData(uuid, ::trySend)) {
                 receiveDataChannel = channel
-                awaitClose{
+                awaitClose {
                     Timber.d("$logTag --> receiveDataFlow closed")
                 }
             }
@@ -107,10 +110,10 @@ class CoroutineClient(context: Context, type: ClientType, serviceUUID: UUID?):
     }
 
     suspend fun sendData(uuid: UUID? = null, data: ByteArray,
-                         timeoutMillis: Long = 3000): Boolean = withContext(Dispatchers.IO){
+                         timeoutMillis: Long = 3000): Boolean = withContext(Dispatchers.IO) {
         suspendCancellableCoroutine { continuation ->
-            sendData(uuid, data, timeoutMillis, 0){ success, _ ->
-                if(!continuation.isCompleted){
+            sendData(uuid, data, timeoutMillis, 0) { success, _ ->
+                if (!continuation.isCompleted) {
                     continuation.resume(success)
                 }
             }
@@ -121,10 +124,10 @@ class CoroutineClient(context: Context, type: ClientType, serviceUUID: UUID?):
     }
 
     suspend fun readData(uuid: UUID? = null,
-                         timeoutMillis: Long = 3000): ByteArray? = withContext(Dispatchers.IO){
+                         timeoutMillis: Long = 3000): ByteArray? = withContext(Dispatchers.IO) {
         suspendCancellableCoroutine { continuation ->
-            readData(uuid, timeoutMillis, 0){ _, data ->
-                if(!continuation.isCompleted){
+            readData(uuid, timeoutMillis, 0) { _, data ->
+                if(!continuation.isCompleted) {
                     continuation.resume(data)
                 }
             }
@@ -134,7 +137,7 @@ class CoroutineClient(context: Context, type: ClientType, serviceUUID: UUID?):
         }
     }
 
-    override fun disconnect(){
+    override fun disconnect() {
         super.disconnect()
         receiveDataChannel?.close()
     }

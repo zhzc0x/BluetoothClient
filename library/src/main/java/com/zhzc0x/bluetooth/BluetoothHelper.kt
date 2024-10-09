@@ -11,7 +11,6 @@ import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.os.Build
 import android.os.Process
-import android.widget.Toast
 import androidx.core.location.LocationManagerCompat
 import com.zhzc0x.bluetooth.client.ClientState
 import timber.log.Timber
@@ -22,10 +21,10 @@ internal object BluetoothHelper {
     var logTag = "BluetoothHelper"
     private lateinit var turnOn: () -> Unit
     private lateinit var turnOff: () -> Unit
-    private val bluetoothReceiver = object: BroadcastReceiver(){
+    private val bluetoothReceiver = object: BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if(intent.action == BluetoothAdapter.ACTION_STATE_CHANGED){
-                when(intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, 0)){
+            if (intent.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
+                when (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, 0)) {
                     BluetoothAdapter.STATE_TURNING_ON -> {
                         Timber.d("$logTag --> 蓝牙正在打开...")
                     }
@@ -78,13 +77,13 @@ internal object BluetoothHelper {
 
     @SuppressLint("MissingPermission")
     fun switchBluetooth(context: Context, bluetoothAdapter: BluetoothAdapter, enable: Boolean,
-                        checkPermission: Boolean = false): Boolean{
-        if(checkPermission && !checkPermissions(context)){
+                        checkPermission: Boolean = false): Boolean {
+        if (checkPermission && !checkPermissions(context)) {
             return false
         }
         //Android13及以上不允许App启用/关闭蓝牙
-        if(Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU){
-            if(enable){
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            if (enable) {
                 Timber.d("$logTag --> 请求开启蓝牙")
                 @Suppress("DEPRECATION")
                 return bluetoothAdapter.enable()
@@ -97,7 +96,7 @@ internal object BluetoothHelper {
         return false
     }
 
-    fun registerSwitchReceiver(context: Context, turnOn: () -> Unit, turnOff: () -> Unit){
+    fun registerSwitchReceiver(context: Context, turnOn: () -> Unit, turnOff: () -> Unit) {
         this.turnOn = turnOn
         this.turnOff = turnOff
         context.registerReceiver(bluetoothReceiver, IntentFilter(
@@ -122,16 +121,15 @@ internal object BluetoothHelper {
         return true
     }
 
-    fun requestPermissions(context: Context){
+    fun requestPermissions(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             (context as Activity).requestPermissions(permissions, 1200)
         }
     }
 
-    fun checkMtuRange(mtu: Int){
-        if(mtu < 23 || mtu > 512){
+    fun checkMtuRange(mtu: Int) {
+        if (mtu < 23 || mtu > 512) {
             throw IllegalArgumentException("The mtu value must be in the 23..512 range")
         }
     }
-
 }
