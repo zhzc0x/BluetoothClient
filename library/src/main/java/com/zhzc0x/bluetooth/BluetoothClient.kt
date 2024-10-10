@@ -60,14 +60,14 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
 
     /**
      * 检查设备蓝牙状态
-     * @param toNext: true 如无蓝牙权限则继续请求权限，如设备蓝牙未开启则继续请求打开，如未开启定位开关（Android12以下需要）则前往设置；
+     * @param isNext: true 如无蓝牙权限则继续请求权限，如设备蓝牙未开启则继续请求打开，如未开启定位开关（Android12以下需要）则前往设置；
      *                false 无操作
      * @return ClientState： NOT_SUPPORT, NO_PERMISSIONS, LOCATION_DISABLE, ENABLE, DISABLE
      * @see com.zhzc0x.bluetooth.client.ClientState
      * */
-    fun checkState(toNext: Boolean = true): ClientState {
+    fun checkState(isNext: Boolean = true): ClientState {
         val state = BluetoothHelper.checkState(context, bluetoothAdapter, false)
-        if (!toNext) {
+        if (!isNext) {
             return state
         }
         when (state) {

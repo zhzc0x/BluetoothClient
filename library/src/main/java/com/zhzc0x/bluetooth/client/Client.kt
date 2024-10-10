@@ -41,11 +41,11 @@ internal interface Client {
 
 }
 
-enum class ClientType{
+enum class ClientType {
     CLASSIC, BLE
 }
 
-enum class ClientState{
+enum class ClientState {
     NOT_SUPPORT, NO_PERMISSIONS, LOCATION_DISABLE, ENABLE, DISABLE
 }
 
