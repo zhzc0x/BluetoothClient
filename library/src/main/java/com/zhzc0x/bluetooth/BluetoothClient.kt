@@ -158,12 +158,10 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
      * @param reconnectCount: 失败重连次数，默认3次，0不重连
      * @param stateCallback: 回调ConnectState
      *
-     * @throws IllegalArgumentException("The mtu value must be in the 23..512 range")
      * */
     @JvmOverloads
     fun connect(device: Device, mtu: Int = 0, timeoutMillis: Long = 6000, reconnectCount: Int = 3,
                 stateCallback: ConnectStateCallback): Boolean {
-        BluetoothHelper.checkMtuRange(mtu)
         if (!checkValid()) {
             return false
         }
@@ -172,9 +170,9 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
                 Timber.d("$logTag --> connectState: $state")
                 if (state == ConnectState.DISCONNECTED && !drivingDisconnect) {
                     Timber.d("$logTag --> 被动 disconnect，可以尝试重连")
-                    checkToReconnect(device, mtu, timeoutMillis, reconnectCount, stateCallback, state)
+                    checkReconnect(device, mtu, timeoutMillis, reconnectCount, stateCallback, state)
                 } else if (state == ConnectState.CONNECT_ERROR || state == ConnectState.CONNECT_TIMEOUT) {
-                    checkToReconnect(device, mtu, timeoutMillis, reconnectCount, stateCallback, state)
+                    checkReconnect(device, mtu, timeoutMillis, reconnectCount, stateCallback, state)
                 } else if (state == ConnectState.CONNECTED) {
                     drivingDisconnect = false
                     curReconnectCount = 0
@@ -186,9 +184,9 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
         }
     }
 
-    private fun checkToReconnect(device: Device, mtu: Int, timeoutMillis: Long,
-                                 reconnectMaxCount: Int, stateCallback: ConnectStateCallback,
-                                 state: ConnectState) {
+    private fun checkReconnect(device: Device, mtu: Int, timeoutMillis: Long,
+                               reconnectMaxCount: Int, stateCallback: ConnectStateCallback,
+                               state: ConnectState) {
         if (reconnectMaxCount > 0) {
             if (curReconnectCount < reconnectMaxCount) {
                 Timber.d("$logTag --> 开始重连count=${++curReconnectCount}")
@@ -287,7 +285,7 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
         client.sendData(uuid, data, timeoutMillis) { success, _ ->
             if (!success) {
                 Timber.d("$logTag --> sendData failed: ${String(data)}")
-                checkToResend(uuid, data, timeoutMillis, resendCount, resendMaxCount, callback)
+                checkResend(uuid, data, timeoutMillis, resendCount, resendMaxCount, callback)
             } else {
                 Timber.d("$logTag --> sendData success: ${String(data)}")
                 callback.call(true, data)
@@ -295,7 +293,7 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
         }
     }
 
-    private fun checkToResend(uuid: UUID?, data: ByteArray, timeoutMillis: Long, resendCount: Int,
+    private fun checkResend(uuid: UUID?, data: ByteArray, timeoutMillis: Long, resendCount: Int,
                               resendMaxCount: Int, callback: DataResultCallback) {
         if (resendMaxCount > 0) {
             if (resendCount < resendMaxCount) {
@@ -330,7 +328,7 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
         client.readData(uuid, timeoutMillis) { success, data ->
             if (!success) {
                 Timber.d("$logTag --> readData failed")
-                checkToReread(uuid, timeoutMillis, rereadCount, resendMaxCount, callback)
+                checkReread(uuid, timeoutMillis, rereadCount, resendMaxCount, callback)
             } else {
                 Timber.d("$logTag --> readData success: ${String(data!!)}")
                 callback.call(true, data)
@@ -338,7 +336,7 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
         }
     }
 
-    private fun checkToReread(uuid: UUID?, timeoutMillis: Long, rereadCount: Int,
+    private fun checkReread(uuid: UUID?, timeoutMillis: Long, rereadCount: Int,
                               resendMaxCount: Int, callback: DataResultCallback) {
         if (resendMaxCount > 0) {
             if (rereadCount < resendMaxCount) {
@@ -372,5 +370,4 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
         BluetoothHelper.unregisterSwitchReceiver(context)
         client.release()
     }
-
 }
