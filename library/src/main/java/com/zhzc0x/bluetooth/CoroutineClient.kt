@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.retryWhen
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -33,9 +34,15 @@ class CoroutineClient(
        return channelFlow {
            if (startScan(0, onEndScan, ::trySend)) {
                scanDeviceChannel = channel
-               delay(timeMillis)
-               withContext(Dispatchers.Main) {
+               launch {
+                   delay(timeMillis)
+                   withContext(Dispatchers.Main) {
+                       stopScan()
+                   }
+               }
+               awaitClose {
                    stopScan()
+                   Timber.d("$logTag --> scanFlow closed")
                }
            }
        }.flowOn(Dispatchers.IO)
@@ -55,7 +62,7 @@ class CoroutineClient(
         val connectFlow = channelFlow {
             if (connect(device, mtu, timeoutMillis, 0) { state ->
                 if (reconnectCount > 0) {
-                    trySendToClose(state, reconnectCount)
+                    checkReconnect(state, reconnectCount)
                 } else {
                     trySend(state)
                 }
@@ -76,7 +83,7 @@ class CoroutineClient(
         }
     }
 
-    private fun ProducerScope<ConnectState>.trySendToClose(state: ConnectState, reconnectCount: Int) {
+    private fun ProducerScope<ConnectState>.checkReconnect(state: ConnectState, reconnectCount: Int) {
         if ((state == ConnectState.DISCONNECTED && !drivingDisconnect) ||
             state == ConnectState.CONNECT_ERROR || state == ConnectState.CONNECT_TIMEOUT) {
             if (curReconnectCount >= reconnectCount) {
@@ -141,5 +148,4 @@ class CoroutineClient(
         super.disconnect()
         receiveDataChannel?.close()
     }
-
 }
