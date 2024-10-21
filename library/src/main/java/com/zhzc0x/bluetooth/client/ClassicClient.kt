@@ -35,6 +35,8 @@ internal class ClassicClient(override val context: Context,
     private var realDevice: BluetoothDevice? = null
     private val timer = Timer()
     private var timeoutTask: TimerTask? = null
+    @Volatile
+    private var receiveData = false
 
     private val stateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -191,10 +193,11 @@ internal class ClassicClient(override val context: Context,
         if (!checkClientValid()) {
             return false
         }
+        receiveData = true
         thread {
             var readFailedCount = 0
             val buffer = ByteArray(if(mtu > 0) mtu else 1024)
-            while (bluetoothSocket?.isConnected == true && readFailedCount < 3) {
+            while (receiveData && bluetoothSocket?.isConnected == true && readFailedCount < 3) {
                 try {
                     val len = bluetoothSocket!!.inputStream.read(buffer)
                     val readData = ByteArray(len)
@@ -208,6 +211,11 @@ internal class ClassicClient(override val context: Context,
                 connectStateCallback.call(ConnectState.CONNECT_ERROR)
             }
         }
+        return true
+    }
+
+    override fun cancelReceive(uuid: UUID?): Boolean {
+        receiveData = false
         return true
     }
 
@@ -294,5 +302,4 @@ internal class ClassicClient(override val context: Context,
             receiverFilter = null
         }
     }
-
 }

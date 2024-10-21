@@ -23,29 +23,28 @@ import kotlin.coroutines.resume
 class CoroutineClient(
     context: Context,
     type: ClientType,
-    serviceUUID: UUID?
+    serviceUUID: UUID? = null
 ): BluetoothClient(context, type, serviceUUID) {
 
     private var scanDeviceChannel: SendChannel<Device>? = null
     private var connectStateChannel: SendChannel<ConnectState>? = null
-    private var receiveDataChannel: SendChannel<ByteArray>? = null
 
     fun startScan(timeMillis: Long, onEndScan: (() -> Unit)? = null): Flow<Device> {
-       return channelFlow {
-           if (startScan(0, onEndScan, ::trySend)) {
-               scanDeviceChannel = channel
-               launch {
-                   delay(timeMillis)
-                   withContext(Dispatchers.Main) {
-                       stopScan()
-                   }
-               }
-               awaitClose {
-                   stopScan()
-                   Timber.d("$logTag --> scanFlow closed")
-               }
-           }
-       }.flowOn(Dispatchers.IO)
+        return channelFlow {
+            if (startScan(0, onEndScan, ::trySend)) {
+                scanDeviceChannel = channel
+                launch {
+                    delay(timeMillis)
+                    withContext(Dispatchers.Main) {
+                        stopScan()
+                    }
+                }
+                awaitClose {
+                    stopScan()
+                    Timber.d("$logTag --> scanFlow closed")
+                }
+            }
+        }.flowOn(Dispatchers.IO)
     }
 
     override fun stopScan() {
@@ -57,16 +56,16 @@ class CoroutineClient(
     }
 
     fun connect(device: Device, mtu: Int = 0, timeoutMillis: Long = 6000,
-                        reconnectCount: Int = 3): Flow<ConnectState> {
+                reconnectCount: Int = 3): Flow<ConnectState> {
         curReconnectCount = 0
         val connectFlow = channelFlow {
             if (connect(device, mtu, timeoutMillis, 0) { state ->
-                if (reconnectCount > 0) {
-                    checkReconnect(state, reconnectCount)
-                } else {
-                    trySend(state)
-                }
-            }) {
+                    if (reconnectCount > 0) {
+                        checkReconnect(state, reconnectCount)
+                    } else {
+                        trySend(state)
+                    }
+                }) {
                 connectStateChannel = channel
                 awaitClose {
                     Timber.d("$logTag --> connectFlow closed")
@@ -108,9 +107,9 @@ class CoroutineClient(
     fun receiveData(uuid: UUID? = null): Flow<ByteArray> {
         return channelFlow {
             if (receiveData(uuid, ::trySend)) {
-                receiveDataChannel = channel
                 awaitClose {
                     Timber.d("$logTag --> receiveDataFlow closed")
+                    cancelReceive(uuid)
                 }
             }
         }.flowOn(Dispatchers.IO)
@@ -142,10 +141,5 @@ class CoroutineClient(
                 continuation.resume(null)
             }
         }
-    }
-
-    override fun disconnect() {
-        super.disconnect()
-        receiveDataChannel?.close()
     }
 }

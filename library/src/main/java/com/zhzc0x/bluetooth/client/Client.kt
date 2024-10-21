@@ -31,6 +31,8 @@ internal interface Client {
 
     fun receiveData(uuid: UUID?, onReceive: (ByteArray) -> Unit): Boolean
 
+    fun cancelReceive(uuid: UUID?): Boolean
+
     fun sendData(uuid: UUID?, data: ByteArray, timeoutMillis: Long, callback: DataResultCallback)
 
     fun readData(uuid: UUID?, timeoutMillis: Long, callback: DataResultCallback)

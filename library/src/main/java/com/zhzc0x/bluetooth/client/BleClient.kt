@@ -87,6 +87,7 @@ internal class BleClient(override val context: Context,
         }
 
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+            Timber.e("$logTag --> onServicesDiscovered: status=$status")
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 discoveredServices = true
                 if (serviceUUID == null) {
@@ -101,7 +102,6 @@ internal class BleClient(override val context: Context,
                     callConnectState(ConnectState.CONNECT_ERROR)
                 }
             } else {
-                Timber.e("$logTag --> onServicesDiscovered: status=$status")
                 callConnectState(ConnectState.CONNECT_ERROR)
             }
         }
@@ -242,21 +242,43 @@ internal class BleClient(override val context: Context,
     override fun receiveData(uuid: UUID?, onReceive: (ByteArray) -> Unit): Boolean {
         val gattService = getGattService() ?: return false
         receiveDataMap[uuid!!] = onReceive
-        val readCharacteristic = gattService.getCharacteristic(uuid)
-        if (readCharacteristic == null) {
+        val receiveCharacteristic = gattService.getCharacteristic(uuid)
+        if (receiveCharacteristic == null) {
             Timber.e("$logTag --> receiveData: getCharacteristic($uuid)=null")
             return  false
         }
-        val notificationResult = bluetoothGatt!!.setCharacteristicNotification(readCharacteristic, true)
-        Timber.d("$logTag --> receiveData: notificationResult=$notificationResult")
-        readCharacteristic.descriptors.forEach {
+        return setCharacteristicNotification(receiveCharacteristic, true)
+    }
+
+    override fun cancelReceive(uuid: UUID?): Boolean {
+        val gattService = getGattService() ?: return false
+        receiveDataMap.remove(uuid)
+        val receiveCharacteristic = gattService.getCharacteristic(uuid)
+        if (receiveCharacteristic == null) {
+            Timber.e("$logTag --> cancelReceive: getCharacteristic($uuid)=null")
+            return  false
+        }
+        return setCharacteristicNotification(receiveCharacteristic, false)
+    }
+
+    private fun setCharacteristicNotification(
+        receiveCharacteristic: BluetoothGattCharacteristic,
+        enable: Boolean
+    ): Boolean {
+        val notificationResult = bluetoothGatt!!.setCharacteristicNotification(receiveCharacteristic, enable)
+        Timber.d("$logTag --> setCharacteristicNotification($enable), result=$notificationResult")
+        val descriptorValue = if (enable) {
+            BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+        } else {
+            BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
+        }
+        @Suppress("DEPRECATION")
+        receiveCharacteristic.descriptors.forEach {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                @Suppress("DEPRECATION")
-                it.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                @Suppress("DEPRECATION")
+                it.value = descriptorValue
                 bluetoothGatt!!.writeDescriptor(it)
             } else {
-                bluetoothGatt!!.writeDescriptor(it, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
+                bluetoothGatt!!.writeDescriptor(it, descriptorValue)
             }
         }
         return notificationResult

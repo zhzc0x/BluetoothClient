@@ -27,7 +27,7 @@ import timber.log.Timber
 import java.lang.IllegalArgumentException
 import java.util.UUID
 
-open class BluetoothClient(private val context: Context, type: ClientType, serviceUUID: UUID?) {
+open class BluetoothClient(private val context: Context, type: ClientType, serviceUUID: UUID? = null) {
 
     protected val logTag: String = this::class.java.simpleName
     private val client: Client
@@ -80,12 +80,12 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
             ClientState.LOCATION_DISABLE -> {
                 (context as Activity).startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
                 Toast.makeText(context, "当前设备蓝牙服务需要开启定位服务！", Toast.LENGTH_SHORT).show()
-            } 
+            }
             else -> {}
         }
         return state
     }
-    
+
     private fun checkValid(): Boolean {
         val state = checkState(true)
         Timber.d("${BluetoothHelper.logTag} --> checkState: $state")
@@ -97,7 +97,7 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
         this.turnOn = turnOn
         this.turnOff = turnOff
     }
-    
+
     /**
      * 开关蓝牙
      * 此系统方法在 API 级别 33 中已弃用。从 Build.VERSION_CODES.TIRAMISU 开始，不允许应用程序启用/禁用蓝牙并总是返回false
@@ -265,6 +265,16 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
     }
 
     /**
+     * 取消数据接收
+     * @param uuid：低功耗蓝牙传入包含notify特征的uuid，经典蓝牙不需要传
+     *
+     * @return Boolean：true设置成功，false设置失败
+     * */
+    fun cancelReceive(uuid: UUID? = null): Boolean {
+        return client.cancelReceive(uuid)
+    }
+
+    /**
      * 发送数据
      * @param uuid：低功耗蓝牙传入包含write特征的uuid，经典蓝牙不需要传
      * @param data: ByteArray
@@ -294,7 +304,7 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
     }
 
     private fun checkResend(uuid: UUID?, data: ByteArray, timeoutMillis: Long, resendCount: Int,
-                              resendMaxCount: Int, callback: DataResultCallback) {
+                            resendMaxCount: Int, callback: DataResultCallback) {
         if (resendMaxCount > 0) {
             if (resendCount < resendMaxCount) {
                 Timber.d("$logTag --> 开始重发count=${resendCount + 1}")
@@ -337,7 +347,7 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
     }
 
     private fun checkReread(uuid: UUID?, timeoutMillis: Long, rereadCount: Int,
-                              resendMaxCount: Int, callback: DataResultCallback) {
+                            resendMaxCount: Int, callback: DataResultCallback) {
         if (resendMaxCount > 0) {
             if (rereadCount < resendMaxCount) {
                 Timber.d("$logTag --> 开始重读count=${rereadCount + 1}")
