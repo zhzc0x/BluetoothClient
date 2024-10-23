@@ -19,7 +19,7 @@ internal interface Client {
 
     fun stopScan()
 
-    fun connect(device: Device, mtu: Int, timeoutMillis: Long, stateCallback: ConnectStateCallback)
+    fun connect(device: Device, mtu: Int, timeoutMillis: Long, stateCallback: ConnectionStateCallback)
 
     fun changeMtu(mtu: Int): Boolean
 
@@ -130,7 +130,7 @@ data class Characteristic(val uuid: UUID,
 
 }
 
-enum class ConnectState(private val desc: String) {
+enum class ConnectionState(private val desc: String) {
     CONNECTING("连接中"),
     CONNECT_TIMEOUT("连接超时"),
     CONNECTED("已连接"),
@@ -139,10 +139,10 @@ enum class ConnectState(private val desc: String) {
     RECONNECT("重新连接");
 }
 
-fun interface ConnectStateCallback {
+fun interface ConnectionStateCallback {
 
     @WorkerThread
-    fun call(state: ConnectState)
+    fun call(state: ConnectionState)
 
 }
 

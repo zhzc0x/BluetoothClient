@@ -28,7 +28,7 @@ internal class ClassicClient(override val context: Context,
     override var writeType: Int = -1
 
     private lateinit var scanDeviceCallback: ScanDeviceCallback
-    private lateinit var connectStateCallback: ConnectStateCallback
+    private lateinit var connectionStateCallback: ConnectionStateCallback
     private var receiverFilter: IntentFilter? = null
     private var bluetoothSocket: BluetoothSocket? = null
     private var mtu = 0
@@ -109,12 +109,12 @@ internal class ClassicClient(override val context: Context,
         }
     }
 
-    override fun connect(device: Device, mtu: Int, timeoutMillis: Long, stateCallback: ConnectStateCallback) {
+    override fun connect(device: Device, mtu: Int, timeoutMillis: Long, stateCallback: ConnectionStateCallback) {
         this.mtu = mtu
-        connectStateCallback = stateCallback
-        connectStateCallback.call(ConnectState.CONNECTING)
+        connectionStateCallback = stateCallback
+        connectionStateCallback.call(ConnectionState.CONNECTING)
         scheduleTimeoutTask(timeoutMillis) {
-            callConnectState(ConnectState.CONNECT_TIMEOUT)
+            callConnectionState(ConnectionState.CONNECT_TIMEOUT)
         }
         connect(bluetoothAdapter!!.getRemoteDevice(device.address))
     }
@@ -128,12 +128,12 @@ internal class ClassicClient(override val context: Context,
         this.realDevice = realDevice
         if (serviceUUID != null) {
             if (createRfcommSocketToConnect()) {
-                callConnectState(ConnectState.CONNECTED)
+                callConnectionState(ConnectionState.CONNECTED)
             } else {
-                callConnectState(ConnectState.CONNECT_ERROR)
+                callConnectionState(ConnectionState.CONNECT_ERROR)
             }
         } else {
-            callConnectState(ConnectState.CONNECTED)
+            callConnectionState(ConnectionState.CONNECTED)
         }
     }
 
@@ -149,12 +149,12 @@ internal class ClassicClient(override val context: Context,
         }
     }
 
-    private fun callConnectState(state: ConnectState) {
+    private fun callConnectionState(state: ConnectionState) {
         cancelTimeoutTask()
-        if (state == ConnectState.CONNECT_TIMEOUT || state == ConnectState.CONNECT_ERROR) {
+        if (state == ConnectionState.CONNECT_TIMEOUT || state == ConnectionState.CONNECT_ERROR) {
             bluetoothSocket?.safeClose()
         }
-        connectStateCallback.call(state)
+        connectionStateCallback.call(state)
     }
 
     override fun changeMtu(mtu: Int): Boolean {
@@ -208,7 +208,7 @@ internal class ClassicClient(override val context: Context,
                 }
             }
             if (readFailedCount >= 3) {
-                connectStateCallback.call(ConnectState.CONNECT_ERROR)
+                connectionStateCallback.call(ConnectionState.CONNECT_ERROR)
             }
         }
         return true
@@ -284,7 +284,7 @@ internal class ClassicClient(override val context: Context,
             bluetoothSocket!!.safeClose()
             bluetoothSocket = null
             realDevice = null
-            callConnectState(ConnectState.DISCONNECTED)
+            callConnectionState(ConnectionState.DISCONNECTED)
         }
     }
 

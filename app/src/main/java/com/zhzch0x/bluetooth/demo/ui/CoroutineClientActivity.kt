@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -39,7 +38,7 @@ import androidx.lifecycle.lifecycleScope
 import com.zhzc0x.bluetooth.CoroutineClient
 import com.zhzc0x.bluetooth.client.ClientState
 import com.zhzc0x.bluetooth.client.ClientType
-import com.zhzc0x.bluetooth.client.ConnectState
+import com.zhzc0x.bluetooth.client.ConnectionState
 import com.zhzc0x.bluetooth.client.Device
 import com.zhzch0x.bluetooth.demo.ext.toHex
 import com.zhzch0x.bluetooth.demo.ui.theme.BluetoothClientTheme
@@ -56,13 +55,13 @@ class CoroutineClientActivity: ComponentActivity() {
     private var bluetoothType by mutableStateOf(ClientType.BLE)
     private lateinit var bluetoothClient: CoroutineClient
     private lateinit var loadingDialog: LoadingDialog
-    private lateinit var scanDeviceDialog: ScanDeviceDialog
+    private lateinit var discoverDeviceDialog: DiscoverDeviceDialog
     private var deviceName by mutableStateOf("")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         loadingDialog = LoadingDialog(this, false)
-        scanDeviceDialog = ScanDeviceDialog(this, ::startScanDevice, ::stopScanDevice, ::connectDevice)
+        discoverDeviceDialog = DiscoverDeviceDialog(this, ::startScanDevice, ::stopScanDevice, ::connectDevice)
         setContent {
             BluetoothClientTheme{
                 Content()
@@ -70,7 +69,6 @@ class CoroutineClientActivity: ComponentActivity() {
         }
     }
 
-    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     private fun Content() {
         Scaffold(Modifier.fillMaxSize(), topBar = {
@@ -91,7 +89,7 @@ class CoroutineClientActivity: ComponentActivity() {
                         expanded = true
                     }.padding(8.dp), fontSize = 16.sp, textAlign = TextAlign.Center)
                     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                        ClientType.values().forEach { clientType ->
+                        ClientType.entries.forEach { clientType ->
                             DropdownMenuItem(text = {
                                 Text(text = "$clientType", fontSize = 16.sp)
                             }, onClick = {
@@ -116,7 +114,7 @@ class CoroutineClientActivity: ComponentActivity() {
                                     showToast("请先开启蓝牙！")
                                 }
                                 ClientState.ENABLE -> {
-                                    scanDeviceDialog.show()
+                                    discoverDeviceDialog.show()
                                 }
                                 else  -> {}
                             }
@@ -164,18 +162,19 @@ class CoroutineClientActivity: ComponentActivity() {
             bluetoothClient = CoroutineClient(this@CoroutineClientActivity, bluetoothType,
                 serviceUid)
             bluetoothClient.setSwitchReceive(turnOn={
-                scanDeviceDialog.show()
+                discoverDeviceDialog.show()
             }, turnOff={
-                scanDeviceDialog.stopScan()
+                discoverDeviceDialog.stop()
             })
         }
     }
 
     private fun startScanDevice(){
         lifecycleScope.launch {
-            bluetoothClient.startScan(30000, scanDeviceDialog::stopScan).collect{ device ->
-                scanDeviceDialog.add(device)
+            bluetoothClient.startScan(30000).collect { device ->
+                discoverDeviceDialog.add(device)
             }
+            discoverDeviceDialog.stop()
         }
     }
 
@@ -186,23 +185,23 @@ class CoroutineClientActivity: ComponentActivity() {
     private fun connectDevice(device: Device){
         stopScanDevice()
         lifecycleScope.launch {
-           bluetoothClient.connect(device, 85, 15000, 3).collect{ connectState ->
-               Timber.d("CoroutineClientActivity --> connectState: $connectState")
-               if(connectState == ConnectState.CONNECTING){
+           bluetoothClient.connect(device, 85, 15000, 3).collect { connectionState ->
+               Timber.d("CoroutineClientActivity --> connectionState: $connectionState")
+               if(connectionState == ConnectionState.CONNECTING){
                    loadingDialog.show()
                } else {
                    loadingDialog.hide()
                }
-               if(connectState == ConnectState.CONNECTED){
+               if(connectionState == ConnectionState.CONNECTED){
                    deviceName = device.name ?: device.address
                    receiveData()
-                   scanDeviceDialog.dismiss()
+                   discoverDeviceDialog.dismiss()
                    showToast("连接成功！")
-               } else if(connectState == ConnectState.DISCONNECTED){
+               } else if(connectionState == ConnectionState.DISCONNECTED){
                    deviceName = ""
-               } else if(connectState == ConnectState.CONNECT_ERROR) {
+               } else if(connectionState == ConnectionState.CONNECT_ERROR) {
                    showToast("连接异常！")
-               } else if(connectState == ConnectState.CONNECT_TIMEOUT) {
+               } else if(connectionState == ConnectionState.CONNECT_TIMEOUT) {
                    showToast("连接超时！")
                }
            }
@@ -238,5 +237,4 @@ class CoroutineClientActivity: ComponentActivity() {
         super.onDestroy()
         bluetoothClient.release()
     }
-
 }

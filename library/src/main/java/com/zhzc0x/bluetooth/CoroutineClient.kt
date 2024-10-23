@@ -2,7 +2,7 @@ package com.zhzc0x.bluetooth
 
 import android.content.Context
 import com.zhzc0x.bluetooth.client.ClientType
-import com.zhzc0x.bluetooth.client.ConnectState
+import com.zhzc0x.bluetooth.client.ConnectionState
 import com.zhzc0x.bluetooth.client.Device
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.ProducerScope
@@ -27,11 +27,11 @@ class CoroutineClient(
 ): BluetoothClient(context, type, serviceUUID) {
 
     private var scanDeviceChannel: SendChannel<Device>? = null
-    private var connectStateChannel: SendChannel<ConnectState>? = null
+    private var connectionStateChannel: SendChannel<ConnectionState>? = null
 
-    fun startScan(timeMillis: Long, onEndScan: (() -> Unit)? = null): Flow<Device> {
+    fun startScan(timeMillis: Long): Flow<Device> {
         return channelFlow {
-            if (startScan(0, onEndScan, ::trySend)) {
+            if (startScan(0, deviceCallback = ::trySend)) {
                 scanDeviceChannel = channel
                 launch {
                     delay(timeMillis)
@@ -56,7 +56,7 @@ class CoroutineClient(
     }
 
     fun connect(device: Device, mtu: Int = 0, timeoutMillis: Long = 6000,
-                reconnectCount: Int = 3): Flow<ConnectState> {
+                reconnectCount: Int = 3): Flow<ConnectionState> {
         curReconnectCount = 0
         val connectFlow = channelFlow {
             if (connect(device, mtu, timeoutMillis, 0) { state ->
@@ -66,7 +66,7 @@ class CoroutineClient(
                         trySend(state)
                     }
                 }) {
-                connectStateChannel = channel
+                connectionStateChannel = channel
                 awaitClose {
                     Timber.d("$logTag --> connectFlow closed")
                 }
@@ -82,23 +82,23 @@ class CoroutineClient(
         }
     }
 
-    private fun ProducerScope<ConnectState>.checkReconnect(state: ConnectState, reconnectCount: Int) {
-        if ((state == ConnectState.DISCONNECTED && !drivingDisconnect) ||
-            state == ConnectState.CONNECT_ERROR || state == ConnectState.CONNECT_TIMEOUT) {
+    private fun ProducerScope<ConnectionState>.checkReconnect(state: ConnectionState, reconnectCount: Int) {
+        if ((state == ConnectionState.DISCONNECTED && !drivingDisconnect) ||
+            state == ConnectionState.CONNECT_ERROR || state == ConnectionState.CONNECT_TIMEOUT) {
             if (curReconnectCount >= reconnectCount) {
                 Timber.d("$logTag --> 超过最大重连次数，停止重连！")
                 trySend(state)
                 disconnect()
             } else {
-                trySend(ConnectState.RECONNECT)
+                trySend(ConnectionState.RECONNECT)
                 close(RuntimeException("设备连接异常: $state, 尝试重连${++curReconnectCount}"))
             }
-        } else if (state == ConnectState.CONNECTED) {
+        } else if (state == ConnectionState.CONNECTED) {
             curReconnectCount = 0
             trySend(state)
-        } else if (state == ConnectState.DISCONNECTED) {
+        } else if (state == ConnectionState.DISCONNECTED) {
             trySend(state)
-            connectStateChannel?.close()
+            connectionStateChannel?.close()
         } else {
             trySend(state)
         }

@@ -16,9 +16,9 @@ import com.zhzc0x.bluetooth.client.ClassicClient
 import com.zhzc0x.bluetooth.client.Client
 import com.zhzc0x.bluetooth.client.ClientState
 import com.zhzc0x.bluetooth.client.ClientType
-import com.zhzc0x.bluetooth.client.ConnectState
+import com.zhzc0x.bluetooth.client.ConnectionState
 
-import com.zhzc0x.bluetooth.client.ConnectStateCallback
+import com.zhzc0x.bluetooth.client.ConnectionStateCallback
 import com.zhzc0x.bluetooth.client.Device
 import com.zhzc0x.bluetooth.client.DataResultCallback
 import com.zhzc0x.bluetooth.client.ScanDeviceCallback
@@ -142,67 +142,65 @@ open class BluetoothClient(private val context: Context, type: ClientType, servi
      *
      * */
     @CallSuper open fun stopScan() {
-        if (onEndScan != null) {
-            Timber.d("$logTag --> 停止扫描设备, ${Thread.currentThread().name}")
-            client.stopScan()
-            onEndScan?.invoke()
-            onEndScan = null
-        }
+        Timber.d("$logTag --> 停止扫描设备, ${Thread.currentThread().name}")
+        client.stopScan()
+        onEndScan?.invoke()
+        onEndScan = null
     }
 
     /**
      * 连接蓝牙设备
      * @param device: startScan返回的Device
      * @param mtu: IntRange(23..512)
-     * @param timeoutMillis: 连接超时时间，默认6000ms，超时后回调ConnectState.CONNECT_TIMEOUT
+     * @param timeoutMillis: 连接超时时间，默认6000ms，超时后回调ConnectionState.CONNECT_TIMEOUT
      * @param reconnectCount: 失败重连次数，默认3次，0不重连
-     * @param stateCallback: 回调ConnectState
+     * @param stateCallback: 回调ConnectionState
      *
      * */
     @JvmOverloads
     fun connect(device: Device, mtu: Int = 0, timeoutMillis: Long = 6000, reconnectCount: Int = 3,
-                stateCallback: ConnectStateCallback): Boolean {
+                stateCallback: ConnectionStateCallback): Boolean {
         if (!checkValid()) {
             return false
         }
         return clientHandler.post {
             client.connect(device, mtu, timeoutMillis) { state ->
-                Timber.d("$logTag --> connectState: $state")
-                if (state == ConnectState.DISCONNECTED && !drivingDisconnect) {
+                Timber.d("$logTag --> connectionState: $state")
+                if (state == ConnectionState.DISCONNECTED && !drivingDisconnect) {
                     Timber.d("$logTag --> 被动 disconnect，可以尝试重连")
                     checkReconnect(device, mtu, timeoutMillis, reconnectCount, stateCallback, state)
-                } else if (state == ConnectState.CONNECT_ERROR || state == ConnectState.CONNECT_TIMEOUT) {
+                } else if (state == ConnectionState.CONNECT_ERROR || state == ConnectionState.CONNECT_TIMEOUT) {
                     checkReconnect(device, mtu, timeoutMillis, reconnectCount, stateCallback, state)
-                } else if (state == ConnectState.CONNECTED) {
+                } else if (state == ConnectionState.CONNECTED) {
                     drivingDisconnect = false
                     curReconnectCount = 0
-                    callConnectState(stateCallback, state)
+                    callConnectionState(stateCallback, state)
                 } else {
-                    callConnectState(stateCallback, state)
+                    callConnectionState(stateCallback, state)
                 }
             }
         }
     }
 
     private fun checkReconnect(device: Device, mtu: Int, timeoutMillis: Long,
-                               reconnectMaxCount: Int, stateCallback: ConnectStateCallback,
-                               state: ConnectState) {
+                               reconnectMaxCount: Int, stateCallback: ConnectionStateCallback,
+                               state: ConnectionState) {
         if (reconnectMaxCount > 0) {
             if (curReconnectCount < reconnectMaxCount) {
                 Timber.d("$logTag --> 开始重连count=${++curReconnectCount}")
-                callConnectState(stateCallback, ConnectState.RECONNECT)
+                callConnectionState(stateCallback, ConnectionState.RECONNECT)
                 connect(device, mtu, timeoutMillis, reconnectMaxCount, stateCallback)
             } else {
                 Timber.d("$logTag --> 超过最大重连次数，停止重连！")
-                callConnectState(stateCallback, state)
+                callConnectionState(stateCallback, state)
                 disconnect()
             }
         } else {
-            callConnectState(stateCallback, state)
+            callConnectionState(stateCallback, state)
         }
     }
 
-    private fun callConnectState(stateCallback: ConnectStateCallback, state: ConnectState) =
+    private fun callConnectionState(stateCallback: ConnectionStateCallback, state: ConnectionState) =
         clientHandler.post { stateCallback.call(state) }
 
     /**

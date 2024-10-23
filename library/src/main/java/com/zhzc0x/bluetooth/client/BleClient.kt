@@ -38,7 +38,7 @@ internal class BleClient(override val context: Context,
     }
 
     private lateinit var scanDeviceCallback: ScanDeviceCallback
-    private lateinit var connectStateCallback: ConnectStateCallback
+    private lateinit var connectionStateCallback: ConnectionStateCallback
     private val receiveDataMap = HashMap<UUID, (ByteArray) -> Unit>()
     private val writeDataMap = HashMap<ByteArray, DataResultCallback>()
     private val readDataMap = HashMap<UUID, DataResultCallback>()
@@ -91,18 +91,18 @@ internal class BleClient(override val context: Context,
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 discoveredServices = true
                 if (serviceUUID == null) {
-                    callConnectState(ConnectState.CONNECTED)
+                    callConnectionState(ConnectionState.CONNECTED)
                     return
                 }
                 val gattService = bluetoothGatt!!.getService(serviceUUID)
                 if (gattService != null) {
-                    callConnectState(ConnectState.CONNECTED)
+                    callConnectionState(ConnectionState.CONNECTED)
                 } else {
                     Timber.e("$logTag --> onServicesDiscovered: getService($serviceUUID)=null")
-                    callConnectState(ConnectState.CONNECT_ERROR)
+                    callConnectionState(ConnectionState.CONNECT_ERROR)
                 }
             } else {
-                callConnectState(ConnectState.CONNECT_ERROR)
+                callConnectionState(ConnectionState.CONNECT_ERROR)
             }
         }
 
@@ -159,16 +159,16 @@ internal class BleClient(override val context: Context,
     private fun discoverServices() {
         if (!bluetoothGatt!!.discoverServices()) {
             Timber.e("$logTag --> discoverServices=false")
-            callConnectState(ConnectState.CONNECT_ERROR)
+            callConnectionState(ConnectionState.CONNECT_ERROR)
         }
     }
 
-    override fun connect(device: Device, mtu: Int, timeoutMillis: Long, stateCallback: ConnectStateCallback) {
+    override fun connect(device: Device, mtu: Int, timeoutMillis: Long, stateCallback: ConnectionStateCallback) {
         this.mtu = mtu
-        connectStateCallback = stateCallback
-        connectStateCallback.call(ConnectState.CONNECTING)
+        connectionStateCallback = stateCallback
+        connectionStateCallback.call(ConnectionState.CONNECTING)
         scheduleTimeoutTask(timeoutMillis) {
-            callConnectState(ConnectState.CONNECT_TIMEOUT)
+            callConnectionState(ConnectionState.CONNECT_TIMEOUT)
         }
         val realDevice = bluetoothAdapter!!.getRemoteDevice(device.address)
         bluetoothGatt?.safeClose()
@@ -189,12 +189,12 @@ internal class BleClient(override val context: Context,
         }
     }
 
-    private fun callConnectState(state: ConnectState) {
+    private fun callConnectionState(state: ConnectionState) {
         cancelTimeoutTask()
-        if (state == ConnectState.CONNECT_TIMEOUT || state == ConnectState.CONNECT_ERROR) {
+        if (state == ConnectionState.CONNECT_TIMEOUT || state == ConnectionState.CONNECT_ERROR) {
             bluetoothGatt?.safeClose()
         }
-        connectStateCallback.call(state)
+        connectionStateCallback.call(state)
     }
 
     override fun changeMtu(mtu: Int): Boolean {
@@ -377,7 +377,7 @@ internal class BleClient(override val context: Context,
             bluetoothGatt = null
             receiveDataMap.clear()
             writeDataMap.clear()
-            callConnectState(ConnectState.DISCONNECTED)
+            callConnectionState(ConnectionState.DISCONNECTED)
         }
     }
 

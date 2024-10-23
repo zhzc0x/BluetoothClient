@@ -11,16 +11,16 @@ import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.zhzc0x.bluetooth.client.Device
-import com.zhzc0x.bluetooth.demo.databinding.DialogScanDeviceBinding
-import com.zhzc0x.bluetooth.demo.databinding.ItemScanDeviceBinding
+import com.zhzc0x.bluetooth.demo.databinding.DialogDiscoverDeviceBinding
+import com.zhzc0x.bluetooth.demo.databinding.ItemDiscoverDeviceBinding
 
-class ScanDeviceDialog(uiContext: Context,
-                       private val onStartScan: () -> Unit,
-                       private val onStopScan: () -> Unit,
-                       private val onSelectDevice: (Device) -> Unit): AlertDialog(uiContext) {
+class DiscoverDeviceDialog(uiContext: Context,
+                           private val onStartDiscover: () -> Unit,
+                           private val onStopDiscover: () -> Unit,
+                           private val onSelectDevice: (Device) -> Unit): AlertDialog(uiContext) {
 
     private val deviceListAdapter = DeviceListAdapter()
-    private val viewBinding = DialogScanDeviceBinding.inflate(LayoutInflater.from(uiContext))
+    private val viewBinding = DialogDiscoverDeviceBinding.inflate(LayoutInflater.from(uiContext))
 
     init {
         setView(viewBinding.root)
@@ -29,17 +29,16 @@ class ScanDeviceDialog(uiContext: Context,
         viewBinding.rvDeviceList.layoutManager = layoutManager
         viewBinding.rvDeviceList.adapter = deviceListAdapter
         setButton(DialogInterface.BUTTON_NEGATIVE, "取消"){ _, _ ->
-            onStopScan()
+
         }
         viewBinding.ivRefresh.setOnClickListener {
-            startScan()
+            start()
         }
         viewBinding.flLoading.setOnClickListener {
             if(viewBinding.progressBar.visibility == View.VISIBLE){
-                onStopScan()
-                stopScan()
+                stop()
             } else {
-                startScan()
+                start()
             }
         }
     }
@@ -53,31 +52,32 @@ class ScanDeviceDialog(uiContext: Context,
     override fun show() {
         if (!isShowing) {
             super.show()
-            startScan()
+            start()
         }
     }
 
     override fun dismiss() {
         if (isShowing) {
             super.dismiss()
-            stopScan()
+            stop()
         }
     }
 
-    private fun startScan(){
+    private fun start(){
+        onStartDiscover()
         deviceListAdapter.reset()
         viewBinding.ivRefresh.visibility = View.GONE
         viewBinding.progressBar.visibility = View.VISIBLE
-        onStartScan()
     }
 
-    fun stopScan(){
+    fun stop(){
+        onStopDiscover()
         viewBinding.progressBar.visibility = View.GONE
         viewBinding.ivRefresh.visibility = View.VISIBLE
     }
 
-    fun add(deviceInfo: Device){
-        deviceListAdapter.add(deviceInfo)
+    fun add(device: Device){
+        deviceListAdapter.add(device)
         if(viewBinding.rvDeviceList.visibility == View.GONE){
             viewBinding.tvNoDevice.visibility = View.GONE
             viewBinding.rvDeviceList.visibility = View.VISIBLE
@@ -86,33 +86,33 @@ class ScanDeviceDialog(uiContext: Context,
 
     inner class DeviceListAdapter : RecyclerView.Adapter<DeviceListAdapter.ViewHolder>() {
 
-        private var deviceInfoList: ArrayList<Device>? = null
+        private var deviceList: ArrayList<Device>? = null
         private var selectedDevice: Device? = null
 
         @SuppressLint("NotifyDataSetChanged")
-        fun update(deviceInfoList: ArrayList<Device>?){
-            this.deviceInfoList = deviceInfoList
+        fun update(deviceList: ArrayList<Device>?){
+            this.deviceList = deviceList
             notifyDataSetChanged()
         }
 
         fun add(deviceInfo: Device){
-            if(deviceInfoList == null){
-                deviceInfoList = ArrayList()
+            if(deviceList == null){
+                deviceList = ArrayList()
             }
-            if(!deviceInfoList!!.contains(deviceInfo)){
-                deviceInfoList!!.add(0, deviceInfo)
+            if(!deviceList!!.contains(deviceInfo)){
+                deviceList!!.add(0, deviceInfo)
                 notifyItemInserted(0)
                 viewBinding.rvDeviceList.scrollToPosition(0)
             }
         }
 
         fun remove(position: Int){
-            deviceInfoList!!.removeAt(position)
+            deviceList!!.removeAt(position)
             notifyItemRemoved(position)
         }
 
         fun reset(){
-            deviceInfoList?.clear()
+            deviceList?.clear()
             selectedDevice = null
         }
 
@@ -123,26 +123,26 @@ class ScanDeviceDialog(uiContext: Context,
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-            return ViewHolder(ItemScanDeviceBinding.inflate(LayoutInflater.from(context)))
+            return ViewHolder(ItemDiscoverDeviceBinding.inflate(LayoutInflater.from(context)))
         }
 
         override fun getItemCount(): Int {
 
-            return deviceInfoList?.size ?: 0
+            return deviceList?.size ?: 0
         }
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-            holder.bind(deviceInfoList!![position])
+            holder.bind(deviceList!![position])
         }
 
-        inner class ViewHolder(private val itemBinding: ItemScanDeviceBinding) : RecyclerView.ViewHolder(itemBinding.root) {
+        inner class ViewHolder(private val itemBinding: ItemDiscoverDeviceBinding) : RecyclerView.ViewHolder(itemBinding.root) {
             
-            fun bind(deviceInfo: Device) {
-                itemBinding.tvName.text = deviceInfo.name ?: deviceInfo.address
-                itemBinding.rbSelected.isChecked = deviceInfo == selectedDevice
+            fun bind(device: Device) {
+                itemBinding.tvName.text = device.name ?: device.address
+                itemBinding.rbSelected.isChecked = device == selectedDevice
                 itemBinding.root.setOnClickListener {
-                    selectDevice(deviceInfo)
-                    onSelectDevice(deviceInfo)
+                    selectDevice(device)
+                    onSelectDevice(device)
                 }
             }
         }
