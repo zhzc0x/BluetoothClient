@@ -4,10 +4,10 @@ Android蓝牙客户端，支持经典蓝牙和低功耗蓝牙BLE，增加协程F
 
 - 支持蓝牙权限自动检测、申请
 - 支持失败自动重连、重发、重读
-- 支持设置重试次数（协程版本暂不支持）
+- 支持设置重连次数
 - 支持设置超时时间
-- 支持连接设备后指定serviceUid，修改mtu
-- 支持BLE设置多个notifyUid监听数据
+- 支持连接设备后指定serviceUuid，修改mtu
+- 支持BLE设置多个notifyUuid数据监听和取消监听
 - 支持ChannelFlow
 
 # Demo
@@ -24,7 +24,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.zhzc0x.bluetooth:client-android:1.0.4")
+    implementation("com.zhzc0x.bluetooth:client-android:1.0.5")
 }
 ```
 
@@ -32,34 +32,32 @@ dependencies {
 
 ```kotlin
 val bluetoothClient = BluetoothClient(context, ClientType.BLE\ClientType.CLASSIC, serviceUid)
-bluetoothClient.startScan(30000, onEndScan={
+bluetoothClient.startScan(30000, onEndScan= {
 	//子线程
 	......
-}){ device ->
+}) { device ->
 	//子线程
 	......
 }
-bluetoothClient.connect(device, mtu){ connectState ->
+bluetoothClient.connect(device, mtu) { connectionState ->
     //子线程
-	if(connectState == ConnectState.CONNECTED){
+	if (connectionState == ConnectionState.CONNECTED) {
     	......
     }  
 }
 //协程版本
 val bluetoothClient = CoroutineClient(context, ClientType.BLE\ClientType.CLASSIC, serviceUid)
 lifecycleScope.launch {
-     bluetoothClient.startScan(30000, onEndScan={
-         //主线程
-     	......
-     }).collect{ device ->
+     bluetoothClient.startScan(30000).collect { device ->
         //此处线程取决于FLow.collect所在的线程
         ......
 	}
+    // 处理停止扫描相关UI交互
 }
 lifecycleScope.launch {
-    bluetoothClient.connect(device, 85, 15000).collect{ connectState ->
+    bluetoothClient.connect(device, 85, 15000).collect { connectionState ->
          //此处线程取决于FLow.collect所在的线程
-    	if(connectState == ConnectState.CONNECTED){
+    	if (connectionState == ConnectionState.CONNECTED) {
             ......
         }                                                   
     }          
@@ -107,14 +105,13 @@ fun stopScan()
  * 连接蓝牙设备                                                                                     
  * @param device: startScan返回的Device                                                          
  * @param mtu: IntRange(23..512)                                                              
- * @param timeoutMillis: 连接超时时间，默认6000ms，超时后回调ConnectState.CONNECT_TIMEOUT                    
+ * @param timeoutMillis: 连接超时时间，默认6000ms，超时后回调ConnectionState.CONNECT_TIMEOUT                    
  * @param reconnectCount: 失败重连次数，默认3次，0不重连                                                    
- * @param stateCallback: 回调ConnectState                                                       
- *                                                                                            
- * @throws IllegalArgumentException("The mtu value must be in the 23..512 range")          
+ * @param stateCallback: 回调ConnectionState                                                       
+ * 
  * */                                                                                         
 @JvmOverloads                                                                                 
-fun connect(device: Device, mtu: Int = 0, timeoutMillis: Long = 6000, reconnectCount: Int = 3, stateCallback: 		ConnectStateCallback)
+fun connect(device: Device, mtu: Int = 0, timeoutMillis: Long = 6000, reconnectCount: Int = 3, stateCallback: 		ConnectionStateCallback)
 
 /**                                    
  * 修改mtu                               
@@ -159,6 +156,14 @@ fun setWriteType(type: Int)
  * */                                                                                     
 @JvmOverloads                                                                             
 fun receiveData(uuid: UUID? = null, @WorkerThread onReceive: (ByteArray) -> Unit): Boolean
+
+/**
+ * 取消数据接收
+ * @param uuid：低功耗蓝牙传入包含notify特征的uuid，经典蓝牙不需要传
+ *
+ * @return Boolean：true设置成功，false设置失败
+ * */
+fun cancelReceive(uuid: UUID? = null): Boolean
 
 /**                                                                          
  * 发送数据                                                                      
