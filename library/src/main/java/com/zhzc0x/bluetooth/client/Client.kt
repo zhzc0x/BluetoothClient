@@ -51,16 +51,21 @@ enum class ClientState {
     NOT_SUPPORT, NO_PERMISSIONS, LOCATION_DISABLE, ENABLE, DISABLE
 }
 
+@ConsistentCopyVisibility
 data class Device internal constructor(
     val address: String,
     val name: String?,
     val type: Type,
-    val bonded: Boolean
+    val bonded: Boolean,
+    val rssi: Int
 ) {
 
+    constructor(address: String, name: String?, type: Type) :
+            this(address, name, type, false, 0)
+
     @SuppressLint("MissingPermission")
-    internal constructor(device: BluetoothDevice, bonded: Boolean) :
-            this(device.address, device.name, typeOf(device.type), bonded)
+    internal constructor(device: BluetoothDevice, bonded: Boolean, rssi: Int) :
+            this(device.address, device.name, typeOf(device.type), bonded, rssi)
 
     enum class Type(val value: Int) {
         CLASSIC(1), BLE(2), DUAL(3), UNKNOWN(-1);

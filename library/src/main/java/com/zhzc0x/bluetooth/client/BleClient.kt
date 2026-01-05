@@ -53,7 +53,7 @@ internal class BleClient(override val context: Context,
             if (TextUtils.isEmpty(device?.name)) {
                 return
             }
-            scanDeviceCallback.call(Device(device, false))
+            scanDeviceCallback.call(Device(device, false, result.rssi))
         }
     }
 
@@ -64,9 +64,7 @@ internal class BleClient(override val context: Context,
     }
 
     override fun stopScan() {
-        if (bluetoothAdapter != null) {
-            bluetoothAdapter.bluetoothLeScanner?.stopScan(scanCallback)
-        }
+        bluetoothAdapter?.bluetoothLeScanner?.stopScan(scanCallback)
     }
 
     private val gattCallback = object : BluetoothGattCallback() {

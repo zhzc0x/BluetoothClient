@@ -8,12 +8,12 @@ group = project.pomGroupId
 version = project.pomVersion
 
 android {
-    compileSdk 34
+    compileSdkVersion 36
     namespace project.pomGroupId
 
     defaultConfig {
         minSdk 21
-        targetSdk 34
+        targetSdk 36
 
         consumerProguardFiles "consumer-rules.pro"
     }
@@ -34,7 +34,7 @@ android {
 }
 
 dependencies {
-    implementation 'androidx.core:core-ktx:1.13.1'
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
+    implementation 'androidx.core:core-ktx:1.17.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2'
     api 'com.jakewharton.timber:timber:5.0.1'
 }

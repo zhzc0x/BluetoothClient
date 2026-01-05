@@ -53,7 +53,8 @@ publishing {
         maven {
             def releasesRepoUrl = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
             def snapshotsRepoUrl = "https://s01.oss.sonatype.org/content/repositories/snapshots/"
-            url = pomVersion.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+//          def repoUrl = pomVersion.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+            def repoUrl = "file:///D:/repository/bluetoothclient/android/"
 
             def userId = ""
             def userToken = ""
@@ -68,10 +69,13 @@ publishing {
                     userToken = properties.getProperty("userToken")
                 }
             }
-            credentials {
-                username userId // ossrhUsername is your sonatype username
-                password userToken // ossrhUsername is your sonatype password
+            if (repoUrl.startsWith("http")) {
+                credentials {
+                    username userId // ossrhUsername is your sonatype username
+                    password userToken // ossrhUsername is your sonatype password
+                }
             }
+            setUrl(repoUrl)
         }
     }
 }
