@@ -24,7 +24,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.zhzc0x.bluetooth:client-android:1.0.5")
+    implementation("com.zhzc0x.bluetooth:client-android:1.0.6")
 }
 ```
 
